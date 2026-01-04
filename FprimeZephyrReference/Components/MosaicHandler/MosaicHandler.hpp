@@ -99,7 +99,6 @@ class MosaicHandler final : public MosaicHandlerComponentBase {
     // Member variables
     // ----------------------------------------------------------------------
 
-    U8 m_data_file_count = 0;
     bool m_receiving = false;
     U32 m_bytes_received = 0;
 

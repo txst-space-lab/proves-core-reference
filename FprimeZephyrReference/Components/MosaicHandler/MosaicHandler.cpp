@@ -298,13 +298,11 @@ void MosaicHandler ::processProtocolBuffer() {
         // Log the extracted size
         this->log_ACTIVITY_HI_GammaReadingSizeExtracted(gammaReadingSize);
 
-        // Generate filename - save to root filesystem
-        char filename[64];
-        snprintf(filename, sizeof(filename), "/gamma_reading_%03d.txt", m_data_file_count++);
-        m_currentFilename = filename;
+        // Use a single filename for all gamma readings - save to root filesystem
+        m_currentFilename = "/gamma_readings.txt";
 
-        // Open file for writing
-        Os::File::Status status = m_file.open(m_currentFilename.c_str(), Os::File::OPEN_WRITE);
+        // Open file for appending (creates file if it doesn't exist)
+        Os::File::Status status = m_file.open(m_currentFilename.c_str(), Os::File::OPEN_APPEND);
 
         if (status != Os::File::OP_OK) {
             // Failed to open file
@@ -386,6 +384,11 @@ void MosaicHandler ::finalizeMosaicTransfer() {
     if (!m_fileOpen) {
         return;
     }
+
+    // Write newline to separate readings
+    const U8 newline = '\n';
+    FwSizeType toWrite = 1;
+    Os::File::Status status = m_file.write(&newline, toWrite, Os::File::WaitType::WAIT);
 
     // Close the file
     m_file.close();

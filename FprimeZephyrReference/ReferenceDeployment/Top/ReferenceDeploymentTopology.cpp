@@ -178,6 +178,9 @@ void setupTopology(const TopologyState& state) {
     drv2605Face5Manager.configure(state.tca9548aDevice, state.muxChannel0Device, state.face5drv2605Device);
 
     detumbleManager.configure();
+
+    // Mosaic Stuff
+    peripheralUartDriver2.configure(state.peripheralUart2, state.peripheralBaudRate2);
 }
 
 void startRateGroups() {

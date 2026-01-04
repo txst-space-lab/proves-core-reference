@@ -115,6 +115,12 @@ module ReferenceDeployment {
     instance downlinkRepeater
     instance dropDetector
 
+    # Mosaic Stuff
+    instance peripheralUartDriver2
+    instance payloadBufferManager2
+    instance mosaicHandler
+    instance payload2
+
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
   # ----------------------------------------------------------------------
@@ -256,6 +262,7 @@ module ReferenceDeployment {
       rateGroup10Hz.RateGroupMemberOut[11] -> sband.run
       rateGroup10Hz.RateGroupMemberOut[12] -> comDelaySband.run
       rateGroup10Hz.RateGroupMemberOut[13] -> dropDetector.schedIn
+      rateGroup10Hz.RateGroupMemberOut[14] -> peripheralUartDriver2.schedIn
 
       # Slow rate (1Hz) rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup1Hz] -> rateGroup1Hz.CycleIn
@@ -278,6 +285,7 @@ module ReferenceDeployment {
       rateGroup1Hz.RateGroupMemberOut[17] -> adcs.run
       rateGroup1Hz.RateGroupMemberOut[18] -> thermalManager.run
       rateGroup1Hz.RateGroupMemberOut[19] -> ComCcsdsLora.authenticationRouter.run
+      rateGroup1Hz.RateGroupMemberOut[20] -> payloadBufferManager2.schedIn
     }
 
 
@@ -477,6 +485,20 @@ module ReferenceDeployment {
       modeManager.loadSwitchTurnOff[6] -> payloadPowerLoadSwitch.turnOff
       modeManager.loadSwitchTurnOff[7] -> payloadBatteryLoadSwitch.turnOff
 
+    }
+
+    # Mosaic Stuff
+    connections PayloadCom2 {
+        payload2.uartForward -> peripheralUartDriver2.$send
+        peripheralUartDriver2.$recv -> payload2.uartDataIn
+
+        payload2.bufferReturn -> peripheralUartDriver2.recvReturnIn
+
+        payload2.uartDataOut -> mosaicHandler.dataIn
+        mosaicHandler.commandOut -> payload2.commandIn
+
+        peripheralUartDriver2.allocate -> payloadBufferManager2.bufferGetCallee
+        peripheralUartDriver2.deallocate -> payloadBufferManager2.bufferSendIn
     }
 
   }

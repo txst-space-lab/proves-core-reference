@@ -252,6 +252,14 @@ telemetry packets ReferenceDeploymentPackets {
     ReferenceDeployment.mosaicHandler.GammaRadiationReading
   }
 
+  # Radiation data products
+  product container RadiationContainer id 0x02 default priority 10
+
+  product record RadiationBatchRecord {
+    Fw.Time Timestamp
+    F64 Readings[]
+  } id 0x01 product container RadiationContainer
+
 } omit {
   CdhCore.cmdDisp.CommandErrors
   # Only has one library, no custom versions

@@ -78,7 +78,7 @@ void RadiationPayload::TAKE_GAMMA_READING_cmdHandler(FwOpcodeType opCode, U32 cm
     // Immediate one-off reading
     const double reading = static_cast<double>(k_uptime_seconds());
     this->m_buffer.push_back(reading);
-    this->tlmWrite_ReadingsCollected(static_cast<FwSizeType>(this->m_buffer.size()));
+    this->tlmWrite_ReadingsCollected(static_cast<FwSizeType>(this->m_buffer.size())); // Update telemetry count
     this->tlmWrite_GammaRadiationReading(reading);
 
     if (this->m_buffer.size() >= this->m_readingsPerFile) {
@@ -94,7 +94,7 @@ void RadiationPayload::TAKE_GAMMA_READING_cmdHandler(FwOpcodeType opCode, U32 cm
 
 void RadiationPayload::writeBufferToFile() {
     // Compose filename with file counter and uptime seconds for uniqueness
-    char filename[128];
+    char filename[128]; // Local buffer for filename construction
     const uint32_t secs = static_cast<uint32_t>(k_uptime_seconds());
     std::snprintf(filename, sizeof(filename), "%s/readings_%05u_%u.bin", RADIATION_DIR, this->m_fileCounter++, secs);
 
@@ -107,9 +107,9 @@ void RadiationPayload::writeBufferToFile() {
     }
 
     // Serialize readings using F Prime ExternalSerializeBuffer then write to file
-    const FwSizeType count = static_cast<FwSizeType>(this->m_buffer.size());
-    const size_t estimated_size = static_cast<size_t>(Fw::Time::SERIALIZED_SIZE) + sizeof(count) + sizeof(F64) * this->m_buffer.size();
-    U8* data = new U8[estimated_size];
+    const FwSizeType count = static_cast<FwSizeType>(this->m_buffer.size()); // Number of readings to serialize
+    const size_t estimated_size = static_cast<size_t>(Fw::Time::SERIALIZED_SIZE) + sizeof(count) + sizeof(F64) * this->m_buffer.size(); // Estimate size needed for serialization (timestamp + count + readings)
+    U8* data = new U8[estimated_size]; // Allocate buffer for serialization
     // Zero buffer to avoid uninitialized bytes
     for (size_t i = 0; i < estimated_size; ++i) {
         data[i] = 0;

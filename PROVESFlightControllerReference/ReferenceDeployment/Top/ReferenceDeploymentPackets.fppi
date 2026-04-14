@@ -138,6 +138,7 @@ telemetry packets ReferenceDeploymentPackets {
     #ComCcsdsSband.commsBufferManager.NoBuffs
     ComCcsdsUart.commsBufferManager.NoBuffs
     payloadBufferManager.NoBuffs
+    payloadBufferManager2.NoBuffs
     ReferenceDeployment.rateGroup50Hz.RgCycleSlips
     ReferenceDeployment.rateGroup10Hz.RgCycleSlips
     ReferenceDeployment.rateGroup1Hz.RgCycleSlips
@@ -148,6 +149,7 @@ telemetry packets ReferenceDeploymentPackets {
     ComCcsdsLora.comQueue.buffQueueDepth
 #    ComCcsdsSband.comQueue.buffQueueDepth
     payloadBufferManager.HiBuffs
+    payloadBufferManager2.HiBuffs
     CdhCore.tlmSend.SendLevel
   }
 
@@ -305,6 +307,8 @@ telemetry packets ReferenceDeploymentPackets {
 #  ComCcsdsSband.commsBufferManager.EmptyBuffs
   ComCcsdsUart.commsBufferManager.EmptyBuffs
   payloadBufferManager.EmptyBuffs
+  payloadBufferManager2.EmptyBuffs
+
 
   ComCcsdsLora.commsBufferManager.TotalBuffs
   ComCcsdsLora.commsBufferManager.CurrBuffs
@@ -313,6 +317,9 @@ telemetry packets ReferenceDeploymentPackets {
 
   payloadBufferManager.TotalBuffs
   payloadBufferManager.CurrBuffs
+
+  payloadBufferManager2.TotalBuffs
+  payloadBufferManager2.CurrBuffs
 
   CdhCore.version.FrameworkVersion
   CdhCore.version.ProjectVersion

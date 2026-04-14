@@ -68,7 +68,10 @@ module ReferenceDeployment {
     stack size Default.STACK_SIZE \
     priority 13
 
-
+  instance payload2: Components.PayloadCom base id 0x10009000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 13
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------
@@ -242,4 +245,27 @@ module ReferenceDeployment {
 
   instance picoTempManager: Drv.PicoTempManager base id 0x10079000
 
+  instance peripheralUartDriver2: Zephyr.ZephyrUartDriver base id 0x1007A000
+  
+  instance payloadBufferManager2: Svc.BufferManager base id 0x1007B000 \
+  {
+    phase Fpp.ToCpp.Phases.configObjects """
+    Svc::BufferManager::BufferBins bins;
+    """
+    phase Fpp.ToCpp.Phases.configComponents """
+    memset(&ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins, 0, sizeof(ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins));
+    // UART RX buffers for MOSAIC UART data streaming (4 KB, 2 buffers for ping-pong)
+    ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins.bins[0].bufferSize = 4 * 1024;
+    ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins.bins[0].numBuffers = 2;
+    ReferenceDeployment::payloadBufferManager2.setup(
+        2,  // manager ID (must be distinct from payloadBufferManager which uses 1)
+        0,  // store ID
+        ComCcsds::Allocation::memAllocator,  // Reuse existing allocator from ComCcsds subtopology
+        ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins
+    );
+    """
+    phase Fpp.ToCpp.Phases.tearDownComponents """
+    ReferenceDeployment::payloadBufferManager2.cleanup();
+    """
+  }
 }

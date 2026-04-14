@@ -118,6 +118,9 @@ module ReferenceDeployment {
 
     instance picoTempManager
 
+    instance peripheralUartDriver2
+    instance payloadBufferManager2
+    instance payload2
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
   # ----------------------------------------------------------------------
@@ -262,10 +265,12 @@ module ReferenceDeployment {
       #rateGroup10Hz.RateGroupMemberOut[11] -> sband.run
       #rateGroup10Hz.RateGroupMemberOut[12] -> comDelaySband.run
       rateGroup10Hz.RateGroupMemberOut[13] -> dropDetector.schedIn
+      rateGroup10Hz.RateGroupMemberOut[14] -> peripheralUartDriver2.schedIn
 
       # Slow rate (1Hz) rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup1Hz] -> rateGroup1Hz.CycleIn
       rateGroup1Hz.RateGroupMemberOut[0] -> ComCcsdsLora.comQueue.run
+      
       #rateGroup1Hz.RateGroupMemberOut[1] -> ComCcsdsSband.comQueue.run
       rateGroup1Hz.RateGroupMemberOut[2] -> CdhCore.$health.Run
       rateGroup1Hz.RateGroupMemberOut[3] -> ComCcsdsLora.commsBufferManager.schedIn
@@ -284,7 +289,7 @@ module ReferenceDeployment {
       rateGroup1Hz.RateGroupMemberOut[17] -> adcs.run
       rateGroup1Hz.RateGroupMemberOut[18] -> thermalManager.run
       rateGroup1Hz.RateGroupMemberOut[19] -> ComCcsdsLora.authenticationRouter.run
-
+      rateGroup1Hz.RateGroupMemberOut[20] -> payloadBufferManager2.schedIn
     }
 
 
@@ -490,6 +495,15 @@ module ReferenceDeployment {
     connections FatalHandler {
       CdhCore.fatalHandler.stopWatchdog -> watchdog.stop
 
+    }
+    connections PayloadCom2 {
+        payload2.uartForward -> peripheralUartDriver2.$send
+        peripheralUartDriver2.$recv -> payload2.uartDataIn
+
+        payload2.bufferReturn -> peripheralUartDriver2.recvReturnIn
+
+        peripheralUartDriver2.allocate -> payloadBufferManager2.bufferGetCallee
+        peripheralUartDriver2.deallocate -> payloadBufferManager2.bufferSendIn
     }
 
   }

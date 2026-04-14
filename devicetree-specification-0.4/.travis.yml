@@ -1,0 +1,71 @@
+sudo: false
+dist: focal
+
+cache:
+  apt: true
+
+env:
+  global:
+      - SPHINXBUILD=~/.local/bin/sphinx-build
+      - DIFF_COMMIT=v0.1
+
+git:
+  depth: false
+
+addons:
+  apt:
+    packages:
+      - python3-pip
+      - latexmk
+      - libalgorithm-diff-perl
+      - texlive
+      - texlive-latex-extra
+      - texlive-humanities
+      - graphviz
+
+install:
+  - pip3 install --user mako
+  - pip3 install --user typing
+  - pip3 install --user Sphinx
+  - pip3 install --user codespell
+
+before_script:
+  - wget https://github.com/ftilmann/latexdiff/releases/download/1.2.1/latexdiff-1.2.1.tar.gz
+  - tar xvf latexdiff-1.2.1.tar.gz
+  - export PATH=$PWD/latexdiff-1.2.1/:$PATH
+
+script:
+  #- git checkout $DIFF_COMMIT
+  #- make latexpdf
+  #- mv build/latex build/latex-previous
+  #- git checkout $TRAVIS_COMMIT
+  - make latexpdf
+  #- make latexdiff
+  - make html
+  - make singlehtml
+
+before_deploy:
+  - cp build/latex/devicetree-specification.pdf build/devicetree-specification-$TRAVIS_TAG.pdf
+  #- cp build/latex/devicetree-specification-changebars.pdf build/devicetree-specification-changebars-$TRAVIS_TAG.pdf
+
+deploy:
+  - provider: releases
+    prerelease: false
+    api_key:
+      # Rob's OAuth token
+      secure: a/cTtohOiHnrvpdrxjmlZFeO4+w+932fCDejZVwDFmvzy1WLmlGUMLc/8wIWZBNVZcpuDjwecKnmWWGXN4pM8yhb1g6K0MiT1MiBdxjsBjPFD7qG7+RR+HKfxvlwQhtTJZ/NKBj7nq4atYUwFikQ4/S0H6z1rym2H7Edsd4Skt7oEV60WH7bseRlSDdOotlQE8eY2UBXewMOS3PhFmPboyd4n7FXAVF18Olk0XLkAtNtV4g8ng8DQ3LHjbjz1aMW0xxZhBgC2kafC/NAiV/OGKpLtyzKfxKbfkoga3LKzntTSBXMYL+rm1yzxlpQOP5+agBvL3SO2nhmXYW48kmPhEnQceBBV2REZ/lhWaLGd/SGW+JudyKc3p3bO7UM9TqfooLjU2pPCkFCcaUWmqbNn3epEEcsPbYOkPDegS79CpzfNKdNIeTnUAw61IS+6TnzUJEcm7XGZByXEOG9bTaCZhHKo06s4yZcWTx3rRb682MemlE0CgQNOKTkVemz7tsjDZWtzueVrXE/PxKDtfqujfBBFNClC035UdnX6xfQJnoytSbW97RnpFErn2r3FyHjh9h8eM/Oa+Kk4U6p/DiRFngveNRe/TAC4Ex1eKQtem7mtjOOQUC6hWGaLAVSxtWe50jlPGezBKJDdk/EHT3w0WIOA1HyoEgVIrNCfgBWh0s=
+      # Grant's OAuth token
+      #secure: OTxLflWvVCKQAdBOMMKIl/M1QQOrJ8QpY9I5hAjGbgrJ0YLurqhHwHXEPU2UFiv85hJRNnUGHRzaU4XRNleKS4QKz5O6WiXo9opgivxILBKodcSPOwxyZioFOGmppgygOFSvHeN+x1TM7MBhHrhUuZiReIndad0LV5lxp5byupJixss2FakAPUgD9bRuXSnwbrVmQUl639/xuU6I7cV6NBebs0Ic/mZAbHRyh427oxw6jMxm0nlMelLL8l7Np7FOxDMMPbIYC3TTY4XkZPnLZ8iA4pfhtPH3MaHFE/9mCC7AEt01C44vLPrQ4/h5MYNszof0tS6dbNDngX684SIm8dcXIB/8ahyZ0t8Lj46NlkOe+eiT9lswpCQ6uIUEhvvng0rUcQ68yi3pEmScn8af2AutpiHpeDIg0Gxtgdrq+S/psWIXxqZ/dRZXUl6rVv3su8Y0ejL7LIcFJFjKNVgXWC1LopxYX7BOe7LtzdAmT5RpNvrVq0lIgDcRPZ68lhFO5VcWEKbf6e61wR3Uf6ePuT2/wzc3Yc6+5JKxMCi9JSH41u+17QK7CAR2D8mkd0qfVNQMlGOmLMsDtHg5KuPvcx0ZOLJRmEseiR18KxR2tIoGcYcZV5HWsMqfK0PYrp9Wjnq55puxvtrTuXZGi6vNH/0awPHZukbVJdPOZUd2ji0=
+    file_glob: true
+    file:
+      - "build/devicetree-specification-*.pdf"
+    skip_cleanup: true
+    on:
+      tags: true
+      branch: master
+  - provider: pages
+    github_token: $GITHUB_TOKEN
+    local_dir: "build/singlehtml"
+    skip_cleanup: true
+    on:
+      branch: master

@@ -179,6 +179,8 @@ void setupTopology(const TopologyState& state) {
 
     detumbleManager.configure();
 
+    peripheralUartDriver2.configure(state.peripheralUart2, state.peripheralBaudRate2);
+
     picoTempManager.configure(state.dieTempDevice);
 
     fsFormat.configure(state.storagePartitionId);

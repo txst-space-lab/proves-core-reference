@@ -1,31 +1,55 @@
 module Components {
-    @ Component that manages MOSAIC radiation readings, stores files to disk
+    @ Component that manages MOSAIC radiation readings using F Prime Data Products
     passive component RadiationPayload {
 
-        @ Commands to control the payload
+        @ Start collecting radiation readings
         sync command START_PAYLOAD()
+
+        @ Stop collecting radiation readings; flushes any buffered readings
         sync command STOP_PAYLOAD()
 
-        @ Optional direct command to trigger a single reading
+        @ Immediately flush any buffered readings into a data product
         sync command TAKE_GAMMA_READING()
 
-        @ Telemetry: number of readings collected since boot
+        @ Number of readings buffered since last flush
         telemetry ReadingsCollected: FwSizeType
 
-        @ Telemetry: number of files written
-        telemetry FilesWritten: FwSizeType
+        @ Number of data products sent to the catalog
+        telemetry DataProductsSent: FwSizeType
+
+        @ Most recent gamma radiation reading received from MOSAIC
+        telemetry GammaRadiationReading: F64
 
         @ Events
         event PayloadStarted() severity activity high format "Radiation payload started"
         event PayloadStopped() severity activity high format "Radiation payload stopped"
-        event FileSaved(path: string) severity activity low format "Saved readings to {}"
-        event FileOperationError(path: string, op: string) severity warning high format "File operation {} failed for {}"
+        event DataProductSent(count: U32) severity activity low format "Sent data product containing {} readings"
+        event DataProductError() severity warning high format "Failed to acquire data product buffer; readings retained"
 
-        @ Configurable parameter: number of readings per file
+        @ Number of readings to batch per data product (default 100)
         param READINGS_PER_FILE: U32 default 100
 
-        @ Periodic run hook (called from a rate group) used to take readings while enabled
+        @ Periodic schedule port driven by a rate group
         sync input port run: Svc.Sched
+
+        @ Raw UART data from MOSAIC radiation sensor via PayloadCom
+        sync input port dataIn: Drv.ByteStreamData
+
+        ###############################################################################
+        # Data Product Ports                                                          #
+        ###############################################################################
+
+        @ Synchronous port to request a data product buffer
+        product get port productGetOut
+
+        @ Port to send a completed data product to the catalog
+        product send port productSendOut
+
+        @ One gamma radiation reading (F64) per record
+        product record GammaReading: F64 id 1
+
+        @ Container batching READINGS_PER_FILE GammaReading records
+        product container RadiationData id 1 default priority 10
 
         ###############################################################################
         # Standard AC Ports: Required for Channels, Events, Commands, and Parameters  #
@@ -50,6 +74,12 @@ module Components {
 
         @ Port for sending telemetry channels to downlink
         telemetry port tlmOut
+
+        @ Port for reading parameters
+        param get port prmGetOut
+
+        @ Port for setting parameters
+        param set port prmSetOut
 
     }
 }

@@ -121,6 +121,11 @@ module ReferenceDeployment {
     instance peripheralUartDriver2
     instance payloadBufferManager2
     instance payload2
+    instance radiationPayload
+    instance dpBufferManager
+    instance dpManager
+    instance dpWriter
+    instance dpCatalog
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
   # ----------------------------------------------------------------------
@@ -266,6 +271,8 @@ module ReferenceDeployment {
       #rateGroup10Hz.RateGroupMemberOut[12] -> comDelaySband.run
       rateGroup10Hz.RateGroupMemberOut[13] -> dropDetector.schedIn
       rateGroup10Hz.RateGroupMemberOut[14] -> peripheralUartDriver2.schedIn
+      rateGroup10Hz.RateGroupMemberOut[15] -> dpManager.schedIn
+      rateGroup10Hz.RateGroupMemberOut[16] -> dpWriter.schedIn
 
       # Slow rate (1Hz) rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup1Hz] -> rateGroup1Hz.CycleIn
@@ -290,6 +297,7 @@ module ReferenceDeployment {
       rateGroup1Hz.RateGroupMemberOut[18] -> thermalManager.run
       rateGroup1Hz.RateGroupMemberOut[19] -> ComCcsdsLora.authenticationRouter.run
       rateGroup1Hz.RateGroupMemberOut[20] -> payloadBufferManager2.schedIn
+      rateGroup1Hz.RateGroupMemberOut[21] -> radiationPayload.run
     }
 
 
@@ -501,9 +509,30 @@ module ReferenceDeployment {
         peripheralUartDriver2.$recv -> payload2.uartDataIn
 
         payload2.bufferReturn -> peripheralUartDriver2.recvReturnIn
+        payload2.uartDataOut -> radiationPayload.dataIn
 
         peripheralUartDriver2.allocate -> payloadBufferManager2.bufferGetCallee
         peripheralUartDriver2.deallocate -> payloadBufferManager2.bufferSendIn
+    }
+
+    connections RadiationPayload {
+      # RadiationPayload → DpManager (synchronous buffer get and send)
+      radiationPayload.productGetOut  -> dpManager.productGetIn[0]
+      radiationPayload.productSendOut -> dpManager.productSendIn[0]
+    }
+
+    connections DataProducts {
+      # DpManager allocates DP buffers from dpBufferManager
+      dpManager.bufferGetOut[0] -> dpBufferManager.bufferGetCallee
+
+      # DpManager forwards filled DPs to DpWriter for disk storage
+      dpManager.productSendOut[0] -> dpWriter.bufferSendIn
+
+      # DpWriter returns deallocated buffers to dpBufferManager
+      dpWriter.deallocBufferSendOut -> dpBufferManager.bufferSendIn
+
+      # DpWriter notifies DpCatalog when a DP file has been written
+      dpWriter.dpWrittenOut -> dpCatalog.addToCat
     }
 
   }

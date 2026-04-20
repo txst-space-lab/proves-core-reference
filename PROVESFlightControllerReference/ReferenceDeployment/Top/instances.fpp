@@ -246,8 +246,10 @@ module ReferenceDeployment {
   instance picoTempManager: Drv.PicoTempManager base id 0x10079000
 
   instance peripheralUartDriver2: Zephyr.ZephyrUartDriver base id 0x1007A000
+
+  instance radiationPayload: Components.RadiationPayload base id 0x1007B000
   
-  instance payloadBufferManager2: Svc.BufferManager base id 0x1007B000 \
+  instance payloadBufferManager2: Svc.BufferManager base id 0x1007C000 \
   {
     phase Fpp.ToCpp.Phases.configObjects """
     Svc::BufferManager::BufferBins bins;
@@ -266,6 +268,73 @@ module ReferenceDeployment {
     """
     phase Fpp.ToCpp.Phases.tearDownComponents """
     ReferenceDeployment::payloadBufferManager2.cleanup();
+    """
+  }
+
+  # ----------------------------------------------------------------------
+  # Data Product Infrastructure
+  # ----------------------------------------------------------------------
+
+  instance dpBufferManager: Svc.BufferManager base id 0x1007D000 \
+  {
+    phase Fpp.ToCpp.Phases.configObjects """
+    Svc::BufferManager::BufferBins bins;
+    """
+    phase Fpp.ToCpp.Phases.configComponents """
+    memset(&ConfigObjects::ReferenceDeployment_dpBufferManager::bins, 0, sizeof(ConfigObjects::ReferenceDeployment_dpBufferManager::bins));
+    // DP buffers for radiation payload data products (2048 bytes each, 4 buffers)
+    ConfigObjects::ReferenceDeployment_dpBufferManager::bins.bins[0].bufferSize = 2048;
+    ConfigObjects::ReferenceDeployment_dpBufferManager::bins.bins[0].numBuffers = 4;
+    ReferenceDeployment::dpBufferManager.setup(
+        3,  // manager ID (1=payloadBufferManager, 2=payloadBufferManager2, 3=dpBufferManager)
+        0,  // store ID
+        ComCcsds::Allocation::memAllocator,
+        ConfigObjects::ReferenceDeployment_dpBufferManager::bins
+    );
+    """
+    phase Fpp.ToCpp.Phases.tearDownComponents """
+    ReferenceDeployment::dpBufferManager.cleanup();
+    """
+  }
+
+  instance dpManager: Svc.DpManager base id 0x1007E000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 7
+
+  instance dpWriter: Svc.DpWriter base id 0x1007F000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 8 \
+  {
+    phase Fpp.ToCpp.Phases.configComponents """
+    Fw::String dpPrefix("/radiation/dp/rad");
+    Os::FileSystem::createDirectory("/radiation/dp", false);
+    ReferenceDeployment::dpWriter.configure(dpPrefix);
+    """
+  }
+
+  instance dpCatalog: Svc.DpCatalog base id 0x10080000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 6 \
+  {
+    phase Fpp.ToCpp.Phases.configObjects """
+    Fw::MallocAllocator dpCatalogAllocator;
+    Fw::FileNameString dpDir("/radiation/dp");
+    Fw::FileNameString dpState("/radiation/dp/catalog_state.dat");
+    """
+    phase Fpp.ToCpp.Phases.configComponents """
+    ReferenceDeployment::dpCatalog.configure(
+        &ConfigObjects::ReferenceDeployment_dpCatalog::dpDir,
+        1,
+        ConfigObjects::ReferenceDeployment_dpCatalog::dpState,
+        0,
+        ConfigObjects::ReferenceDeployment_dpCatalog::dpCatalogAllocator
+    );
+    """
+    phase Fpp.ToCpp.Phases.tearDownComponents """
+    ReferenceDeployment::dpCatalog.shutdown();
     """
   }
 }

@@ -115,6 +115,12 @@ telemetry packets ReferenceDeploymentPackets {
     ReferenceDeployment.cameraHandler.ImagesSaved
   }
 
+  packet RadiationPayload id 23 group 4 {
+    ReferenceDeployment.radiationPayload.ReadingsCollected
+    ReferenceDeployment.radiationPayload.DataProductsSent
+    ReferenceDeployment.radiationPayload.GammaRadiationReading
+  }
+
   ### Health and Status Packets ###
   packet Health id 2 group 5 {
     ComCcsdsLora.comQueue.comQueueDepth
@@ -326,5 +332,23 @@ telemetry packets ReferenceDeploymentPackets {
   CdhCore.version.LibraryVersion01
 
   ReferenceDeployment.watchdog.WatchdogTransitions
+
+  # DP infrastructure — internal bookkeeping not needed in normal ops
+  ReferenceDeployment.dpBufferManager.TotalBuffs
+  ReferenceDeployment.dpBufferManager.CurrBuffs
+  ReferenceDeployment.dpBufferManager.HiBuffs
+  ReferenceDeployment.dpBufferManager.NoBuffs
+  ReferenceDeployment.dpBufferManager.EmptyBuffs
+  ReferenceDeployment.dpManager.NumSuccessfulAllocations
+  ReferenceDeployment.dpManager.NumFailedAllocations
+  ReferenceDeployment.dpManager.NumDataProducts
+  ReferenceDeployment.dpManager.NumBytes
+  ReferenceDeployment.dpWriter.NumBuffersReceived
+  ReferenceDeployment.dpWriter.NumBytesWritten
+  ReferenceDeployment.dpWriter.NumSuccessfulWrites
+  ReferenceDeployment.dpWriter.NumFailedWrites
+  ReferenceDeployment.dpWriter.NumErrors
+  ReferenceDeployment.dpCatalog.CatalogDps
+  ReferenceDeployment.dpCatalog.DpsSent
 
 }

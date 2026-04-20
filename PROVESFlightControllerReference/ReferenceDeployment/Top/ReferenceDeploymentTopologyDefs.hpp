@@ -13,7 +13,7 @@
 #include "PROVESFlightControllerReference/ComCcsdsLora/PingEntries.hpp"
 // #include "PROVESFlightControllerReference/ComCcsdsSband/PingEntries.hpp"
 #include "Svc/Subtopologies/CdhCore/PingEntries.hpp"
-#include "Svc/Subtopologies/DataProducts/PingEntries.hpp"
+// Not using DataProducts subtopology; DP instances are defined directly in this deployment
 // Replaced with override section below
 // #include "Svc/Subtopologies/FileHandling/PingEntries.hpp"
 
@@ -69,6 +69,12 @@ namespace FileHandling_fileUplink {
 enum { WARN = 3, FATAL = 5 };
 }
 namespace FileHandling_prmDb {
+enum { WARN = 3, FATAL = 5 };
+}
+}  // namespace PingEntries
+
+namespace PingEntries {
+namespace ReferenceDeployment_dpCatalog {
 enum { WARN = 3, FATAL = 5 };
 }
 }  // namespace PingEntries

@@ -141,8 +141,10 @@ void setupTopology(const TopologyState& state) {
     //    spiDriver.configure(state.spi0Device, cfg);
     //    sband.configureRadio();
 
-    // UART from the board to the payload
+    // UART from the board to the payload (camera)
     peripheralUartDriver.configure(state.peripheralUart, state.peripheralBaudRate);
+    // UART from the board to the MOSAIC radiation sensor
+    peripheralUartDriver2.configure(state.peripheralUart2, state.peripheralBaudRate2);
     imuManager.configure(state.lis2mdlDevice, state.lsm6dsoDevice);
     ina219SysManager.configure(state.ina219SysDevice);
     ina219SolManager.configure(state.ina219SolDevice);
@@ -182,6 +184,10 @@ void setupTopology(const TopologyState& state) {
     picoTempManager.configure(state.dieTempDevice);
 
     fsFormat.configure(state.storagePartitionId);
+
+    // Load persisted file count after filesystem is ready
+    mosaicHandler.configure();
+
 }
 
 void startRateGroups() {

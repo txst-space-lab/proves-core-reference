@@ -242,4 +242,35 @@ module ReferenceDeployment {
 
   instance picoTempManager: Drv.PicoTempManager base id 0x10079000
 
+  instance mosaicHandler: Components.RadiationPayload base id 0x1007A000
+
+  instance peripheralUartDriver2: Zephyr.ZephyrUartDriver base id 0x1007B000
+
+  instance payloadBufferManager2: Svc.BufferManager base id 0x1007C000 \
+  {
+    phase Fpp.ToCpp.Phases.configObjects """
+    Svc::BufferManager::BufferBins bins;
+    """
+    phase Fpp.ToCpp.Phases.configComponents """
+    memset(&ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins, 0, sizeof(ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins));
+    // UART RX buffers for MOSAIC radiation data (4 KB, 2 buffers for ping-pong)
+    ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins.bins[0].bufferSize = 4 * 1024;
+    ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins.bins[0].numBuffers = 2;
+    ReferenceDeployment::payloadBufferManager2.setup(
+        2,  // manager ID
+        0,  // store ID
+        ComCcsds::Allocation::memAllocator,
+        ConfigObjects::ReferenceDeployment_payloadBufferManager2::bins
+    );
+    """
+    phase Fpp.ToCpp.Phases.tearDownComponents """
+    ReferenceDeployment::payloadBufferManager2.cleanup();
+    """
+  }
+
+  instance payload2: Components.PayloadCom base id 0x1007D000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 13
+
 }

@@ -115,6 +115,13 @@ telemetry packets ReferenceDeploymentPackets {
     ReferenceDeployment.cameraHandler.ImagesSaved
   }
 
+  packet RadiationPayload id 23 group 4 {
+    ReferenceDeployment.mosaicHandler.PowerState
+    ReferenceDeployment.mosaicHandler.ReadingsInCurrentFile
+    ReferenceDeployment.mosaicHandler.FilesWritten
+    ReferenceDeployment.mosaicHandler.TotalReadings
+  }
+
   ### Health and Status Packets ###
   packet Health id 2 group 5 {
     ComCcsdsLora.comQueue.comQueueDepth
@@ -313,6 +320,12 @@ telemetry packets ReferenceDeploymentPackets {
 
   payloadBufferManager.TotalBuffs
   payloadBufferManager.CurrBuffs
+
+  payloadBufferManager2.EmptyBuffs
+  payloadBufferManager2.TotalBuffs
+  payloadBufferManager2.CurrBuffs
+  payloadBufferManager2.HiBuffs
+  payloadBufferManager2.NoBuffs
 
   CdhCore.version.FrameworkVersion
   CdhCore.version.ProjectVersion

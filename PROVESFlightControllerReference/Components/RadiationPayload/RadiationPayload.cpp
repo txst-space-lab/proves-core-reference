@@ -49,6 +49,7 @@ void RadiationPayload::POWER_ON_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
         return;
     }
 
+    this->turnOnPayload_out(0);
     m_powered = true;
     m_readingsInFile = 0;
 
@@ -69,6 +70,7 @@ void RadiationPayload::POWER_OFF_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
         return;
     }
 
+    this->turnOffPayload_out(0);
     m_powered = false;
     m_receiving = false;
     m_bytes_received = 0;

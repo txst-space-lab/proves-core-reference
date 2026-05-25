@@ -78,6 +78,10 @@ module Components {
         # Ports
         # ------------------------------------------------------------------
 
+        output port turnOnPayload: Fw.Signal
+
+        output port turnOffPayload: Fw.Signal
+
         @ Receives raw byte stream from MOSAIC via PayloadCom (UART RX)
         sync input port dataIn: Drv.ByteStreamData
 

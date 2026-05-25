@@ -511,8 +511,11 @@ module ReferenceDeployment {
 
     connections FatalHandler {
       CdhCore.fatalHandler.stopWatchdog -> watchdog.stop
-
     }
 
+    connections RadiationPayload {
+      mosaicHandler.turnOnPayload -> payloadPowerLoadSwitch.turnOn
+      mosaicHandler.turnOffPayload -> payloadPowerLoadSwitch.turnOff
+    }
   }
 }

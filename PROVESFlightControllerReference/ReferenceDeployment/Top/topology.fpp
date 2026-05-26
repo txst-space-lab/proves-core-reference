@@ -283,7 +283,6 @@ module ReferenceDeployment {
       rateGroup1Hz.RateGroupMemberOut[10] -> fsSpace.run
       rateGroup1Hz.RateGroupMemberOut[11] -> payloadBufferManager.schedIn
       rateGroup1Hz.RateGroupMemberOut[12] -> payloadBufferManager2.schedIn
-      rateGroup1Hz.RateGroupMemberOut[20] -> mosaicHandler.run
       rateGroup1Hz.RateGroupMemberOut[13] -> FileHandling.fileDownlink.Run
       rateGroup1Hz.RateGroupMemberOut[14] -> startupManager.run
       rateGroup1Hz.RateGroupMemberOut[15] -> powerMonitor.run
@@ -398,7 +397,6 @@ module ReferenceDeployment {
 
       # PayloadCom2 <-> RadiationPayload (mosaicHandler) data flow
       payload2.uartDataOut -> mosaicHandler.dataIn
-      mosaicHandler.commandOut -> payload2.commandIn
 
       peripheralUartDriver2.allocate -> payloadBufferManager2.bufferGetCallee
       peripheralUartDriver2.deallocate -> payloadBufferManager2.bufferSendIn
@@ -511,11 +509,6 @@ module ReferenceDeployment {
 
     connections FatalHandler {
       CdhCore.fatalHandler.stopWatchdog -> watchdog.stop
-    }
-
-    connections RadiationPayload {
-      mosaicHandler.turnOnPayload -> payloadPowerLoadSwitch.turnOn
-      mosaicHandler.turnOffPayload -> payloadPowerLoadSwitch.turnOff
     }
   }
 }

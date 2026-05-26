@@ -24,12 +24,6 @@ class RadiationPayload final : public RadiationPayloadComponentBase {
                         Fw::Buffer& buffer,
                         const Drv::ByteStreamStatus& status) override;
 
-    void run_handler(FwIndexType portNum, U32 context) override;
-
-    // Command handlers
-    void POWER_ON_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
-    void POWER_OFF_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
-
     // Protocol helpers (adapted from MosaicHandler)
     bool accumulateProtocolData(const U8* data, U32 size);
     void processProtocolBuffer();
@@ -53,7 +47,6 @@ class RadiationPayload final : public RadiationPayloadComponentBase {
 
   private:
     // ON/OFF and file rotation state
-    bool m_powered = false;
     U32 m_readingsInFile = 0;
     U32 m_filesWritten = 0;
     U32 m_totalReadings = 0;

@@ -116,7 +116,6 @@ telemetry packets ReferenceDeploymentPackets {
   }
 
   packet RadiationPayload id 23 group 4 {
-    ReferenceDeployment.mosaicHandler.PowerState
     ReferenceDeployment.mosaicHandler.ReadingsInCurrentFile
     ReferenceDeployment.mosaicHandler.FilesWritten
     ReferenceDeployment.mosaicHandler.TotalReadings

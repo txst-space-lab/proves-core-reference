@@ -5,31 +5,8 @@ module Components {
     passive component RadiationPayload {
 
         # ------------------------------------------------------------------
-        # Commands
-        # ------------------------------------------------------------------
-
-        @ Power on the payload and begin collecting readings continuously
-        sync command POWER_ON()
-
-        @ Power off the payload and stop collecting readings
-        sync command POWER_OFF()
-
-        # ------------------------------------------------------------------
         # Events
         # ------------------------------------------------------------------
-
-        @ Payload powered on and first reading requested
-        event PayloadOn() severity activity high format "Radiation payload powered on"
-
-        @ Payload powered off
-        event PayloadOff(totalReadings: U32) \
-            severity activity high format "Radiation payload powered off, {} readings stored this session"
-
-        @ POWER_ON received but payload was already on
-        event AlreadyOn() severity warning low format "Radiation payload is already on"
-
-        @ POWER_OFF received but payload was already off
-        event AlreadyOff() severity warning low format "Radiation payload is already off"
 
         @ A single reading was successfully written to disk
         event ReadingComplete(readingNum: U32, fileNum: U32) \
@@ -55,9 +32,6 @@ module Components {
         # Telemetry
         # ------------------------------------------------------------------
 
-        @ Whether the payload is currently powered on and collecting
-        telemetry PowerState: bool
-
         @ Readings written to the current open file
         telemetry ReadingsInCurrentFile: U32
 
@@ -78,18 +52,8 @@ module Components {
         # Ports
         # ------------------------------------------------------------------
 
-        output port turnOnPayload: Fw.Signal
-
-        output port turnOffPayload: Fw.Signal
-
         @ Receives raw byte stream from MOSAIC via PayloadCom (UART RX)
         sync input port dataIn: Drv.ByteStreamData
-
-        @ Sends commands and ACKs to MOSAIC via PayloadCom (UART TX)
-        output port commandOut: Drv.ByteStreamData
-
-        @ Rate group connection for periodic telemetry
-        sync input port run: Svc.Sched
 
         ###############################################################################
         # Standard AC Ports: Required for Channels, Events, Commands, and Parameters  #

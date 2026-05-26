@@ -34,70 +34,12 @@ RadiationPayload::~RadiationPayload() {
 }
 
 // ----------------------------------------------------------------------
-// Command handlers
-// ----------------------------------------------------------------------
-
-void RadiationPayload::POWER_ON_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (m_powered) {
-        this->log_WARNING_LO_AlreadyOn();
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-        return;
-    }
-
-    if (!openNextFile()) {
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
-        return;
-    }
-
-    this->turnOnPayload_out(0);
-    m_powered = true;
-    m_readingsInFile = 0;
-
-    this->log_ACTIVITY_HI_PayloadOn();
-    this->tlmWrite_PowerState(true);
-    this->tlmWrite_ReadingsInCurrentFile(m_readingsInFile);
-    this->tlmWrite_FilesWritten(m_filesWritten);
-    this->tlmWrite_TotalReadings(m_totalReadings);
-
-    requestReading();
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-}
-
-void RadiationPayload::POWER_OFF_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (!m_powered) {
-        this->log_WARNING_LO_AlreadyOff();
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-        return;
-    }
-
-    this->turnOffPayload_out(0);
-    m_powered = false;
-    m_receiving = false;
-    m_bytes_received = 0;
-    m_expected_size = 0;
-    clearProtocolBuffer();
-    closeCurrentFile();
-
-    this->log_ACTIVITY_HI_PayloadOff(m_totalReadings);
-    this->tlmWrite_PowerState(false);
-    this->tlmWrite_ReadingsInCurrentFile(m_readingsInFile);
-    this->tlmWrite_FilesWritten(m_filesWritten);
-    this->tlmWrite_TotalReadings(m_totalReadings);
-
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-}
-
-// ----------------------------------------------------------------------
 // Port handlers
 // ----------------------------------------------------------------------
 
 void RadiationPayload::dataIn_handler(FwIndexType portNum,
                                       Fw::Buffer& buffer,
                                       const Drv::ByteStreamStatus& status) {
-    if (!m_powered) {
-        return;
-    }
-
     if (status != Drv::ByteStreamStatus::OP_OK) {
         if (m_receiving) {
             handleTransferError();
@@ -124,14 +66,13 @@ void RadiationPayload::dataIn_handler(FwIndexType portNum,
         }
 
         m_bytes_received += toWrite;
-        sendAck();
 
         if (m_bytes_received >= m_expected_size) {
             finalizeReading();
 
             // If MOSAIC sent extra bytes (next header), process them now
             U32 extraBytes = dataSize - toWrite;
-            if (extraBytes > 0 && m_powered) {
+            if (extraBytes > 0) {
                 if (accumulateProtocolData(data + toWrite, extraBytes)) {
                     processProtocolBuffer();
                 }
@@ -153,13 +94,6 @@ void RadiationPayload::dataIn_handler(FwIndexType portNum,
 
         processProtocolBuffer();
     }
-}
-
-void RadiationPayload::run_handler(FwIndexType portNum, U32 context) {
-    this->tlmWrite_PowerState(m_powered);
-    this->tlmWrite_ReadingsInCurrentFile(m_readingsInFile);
-    this->tlmWrite_FilesWritten(m_filesWritten);
-    this->tlmWrite_TotalReadings(m_totalReadings);
 }
 
 // ----------------------------------------------------------------------
@@ -240,8 +174,6 @@ void RadiationPayload::processProtocolBuffer() {
     m_bytes_received = 0;
     m_expected_size = readingSize;
 
-    sendAck();
-
     // Remove the header from the buffer
     U32 afterHeader = m_protocolBufferSize - HEADER_SIZE;
     if (afterHeader > 0) {
@@ -299,13 +231,11 @@ void RadiationPayload::finalizeReading() {
 
     Fw::LogStringArg pathArg(m_currentFilename);
     this->log_ACTIVITY_HI_GammaReadingReceived(m_bytes_received, pathArg);
-    this->log_ACTIVITY_LO_ReadingComplete(m_readingsInFile, m_filesWritten);
+    // this->log_ACTIVITY_LO_ReadingComplete(m_readingsInFile, m_filesWritten);
 
     m_receiving = false;
     m_bytes_received = 0;
     m_expected_size = 0;
-
-    sendAck();
 
     // Rotate file if the reading limit has been reached
     Fw::ParamValid valid;
@@ -320,22 +250,14 @@ void RadiationPayload::finalizeReading() {
         m_filesWritten++;
         m_readingsInFile = 0;
 
-        if (m_powered) {
-            if (!openNextFile()) {
-                m_powered = false;
-                this->tlmWrite_PowerState(false);
-                return;
-            }
+        if (!openNextFile()) {
+            return;
         }
     }
 
     this->tlmWrite_ReadingsInCurrentFile(m_readingsInFile);
     this->tlmWrite_FilesWritten(m_filesWritten);
     this->tlmWrite_TotalReadings(m_totalReadings);
-
-    if (m_powered) {
-        requestReading();
-    }
 }
 
 void RadiationPayload::handleTransferError() {
@@ -359,18 +281,6 @@ bool RadiationPayload::isGammaStartCommand(const U8* data, U32 length) {
         }
     }
     return true;
-}
-
-void RadiationPayload::sendAck() {
-    const char* ackMsg = "<TXSTATE>\n";
-    Fw::Buffer ackBuffer(reinterpret_cast<U8*>(const_cast<char*>(ackMsg)), strlen(ackMsg));
-    this->commandOut_out(0, ackBuffer, Drv::ByteStreamStatus::OP_OK);
-}
-
-void RadiationPayload::requestReading() {
-    const char* cmd = "gamma_begin\n";
-    Fw::Buffer cmdBuffer(reinterpret_cast<U8*>(const_cast<char*>(cmd)), strlen(cmd));
-    this->commandOut_out(0, cmdBuffer, Drv::ByteStreamStatus::OP_OK);
 }
 
 // ----------------------------------------------------------------------

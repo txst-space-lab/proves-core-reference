@@ -467,14 +467,14 @@ module ReferenceDeployment {
       # face4 = index 0, face0 = index 1, face1 = index 2, face2 = index 3
       # face3 = index 4, face5 = index 5, payloadPower = index 6, payloadBattery = index 7
       # TODO(ALLTEAMS): Configure the faces you want to automatically turn on
-      # modeManager.loadSwitchTurnOn[0] -> face4LoadSwitch.turnOn
-      # modeManager.loadSwitchTurnOn[1] -> face0LoadSwitch.turnOn
-      # modeManager.loadSwitchTurnOn[2] -> face1LoadSwitch.turnOn
-      # modeManager.loadSwitchTurnOn[3] -> face2LoadSwitch.turnOn
-      # modeManager.loadSwitchTurnOn[4] -> face3LoadSwitch.turnOn
-      # modeManager.loadSwitchTurnOn[5] -> face5LoadSwitch.turnOn
-      # modeManager.loadSwitchTurnOn[6] -> payloadPowerLoadSwitch.turnOn
-      # modeManager.loadSwitchTurnOn[7] -> payloadBatteryLoadSwitch.turnOn
+      modeManager.loadSwitchTurnOn[0] -> face4LoadSwitch.turnOn
+      modeManager.loadSwitchTurnOn[1] -> face0LoadSwitch.turnOn
+      modeManager.loadSwitchTurnOn[2] -> face1LoadSwitch.turnOn
+      modeManager.loadSwitchTurnOn[3] -> face2LoadSwitch.turnOn
+      modeManager.loadSwitchTurnOn[4] -> face3LoadSwitch.turnOn
+      modeManager.loadSwitchTurnOn[5] -> face5LoadSwitch.turnOn
+      modeManager.loadSwitchTurnOn[6] -> payloadPowerLoadSwitch.turnOn
+      modeManager.loadSwitchTurnOn[7] -> payloadBatteryLoadSwitch.turnOn
 
       modeManager.loadSwitchTurnOff[0] -> face4LoadSwitch.turnOff
       modeManager.loadSwitchTurnOff[1] -> face0LoadSwitch.turnOff

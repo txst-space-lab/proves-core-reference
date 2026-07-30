@@ -431,6 +431,16 @@ gds: ## Run FPrime GDS
 	fi
 	$(GDS_COMMAND)
 
+.PHONY: gds2
+gds2: ## Run a second FPrime GDS GUI on port 5001
+	@echo "Running FPrime GDS on GUI port 5001..."
+	@if [ -n "$(UART_DEVICE)" ]; then \
+		echo "Using UART_DEVICE=$(UART_DEVICE)"; \
+		$(GDS_COMMAND) --gui-port 5001 --uart-device $(UART_DEVICE); \
+	else \
+		$(GDS_COMMAND) --gui-port 5001; \
+	fi
+
 .PHONY: delete-shadow-gds
 delete-shadow-gds:
 	@echo "Deleting shadow GDS..."

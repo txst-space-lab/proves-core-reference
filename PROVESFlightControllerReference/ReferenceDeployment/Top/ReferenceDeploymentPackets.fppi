@@ -119,6 +119,10 @@ telemetry packets ReferenceDeploymentPackets {
     ReferenceDeployment.mosaicHandler.ReadingsInCurrentFile
     ReferenceDeployment.mosaicHandler.FilesWritten
     ReferenceDeployment.mosaicHandler.TotalReadings
+    ReferenceDeployment.mosaicHandler.BytesReceivedTotal
+    ReferenceDeployment.mosaicHandler.DataChunksReceived
+    payloadBufferManager2.HiBuffs
+    payloadBufferManager2.NoBuffs
   }
 
   ### Health and Status Packets ###
@@ -323,8 +327,6 @@ telemetry packets ReferenceDeploymentPackets {
   payloadBufferManager2.EmptyBuffs
   payloadBufferManager2.TotalBuffs
   payloadBufferManager2.CurrBuffs
-  payloadBufferManager2.HiBuffs
-  payloadBufferManager2.NoBuffs
 
   CdhCore.version.FrameworkVersion
   CdhCore.version.ProjectVersion

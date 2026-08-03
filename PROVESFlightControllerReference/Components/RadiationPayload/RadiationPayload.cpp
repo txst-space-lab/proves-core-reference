@@ -3,12 +3,10 @@
 // \brief  RadiationPayload component implementation.
 //
 // Collects gamma radiation readings from the MOSAIC payload over UART.
-// Protocol: MOSAIC sends <GAMMA_START><SIZE>[4-byte LE uint32]</SIZE>[data]
-// This component ACKs each chunk with <TXSTATE> and requests the next
-// reading with "gamma_begin\n" until powered off.
-//
-// Each file holds READINGS_PER_FILE readings (default 100). When full,
-// the file is closed and a new one is opened automatically.
+// MOSAIC firmware emits ASCII records of the form:
+//   <GAMMA_START><ANALOGSIZE>N</ANALOGSIZE>V<MILLIVOLTSIZE>N</MILLIVOLTSIZE>V<GAMMA_END>\n
+// We treat each <GAMMA_START>...<GAMMA_END> span as one reading and persist
+// it verbatim. READINGS_PER_FILE readings per file before rotating.
 // ======================================================================
 
 #include "PROVESFlightControllerReference/Components/RadiationPayload/RadiationPayload.hpp"
@@ -41,63 +39,40 @@ void RadiationPayload::dataIn_handler(FwIndexType portNum,
                                       Fw::Buffer& buffer,
                                       const Drv::ByteStreamStatus& status) {
     if (status != Drv::ByteStreamStatus::OP_OK) {
-        if (m_receiving) {
-            handleTransferError();
-        }
         return;
     }
-
     if (!buffer.isValid()) {
         return;
     }
 
     const U8* data = buffer.getData();
     U32 dataSize = static_cast<U32>(buffer.getSize());
-
-    if (m_receiving && m_fileOpen) {
-        U32 remaining = m_expected_size - m_bytes_received;
-        U32 toWrite = (dataSize < remaining) ? dataSize : remaining;
-
-        if (!writeChunkToFile(data, toWrite)) {
-            Fw::LogStringArg desc("File write failed");
-            this->log_WARNING_HI_TransferError(desc);
-            handleTransferError();
-            return;
-        }
-
-        m_bytes_received += toWrite;
-
-        if (m_bytes_received >= m_expected_size) {
-            finalizeReading();
-
-            // If MOSAIC sent extra bytes (next header), process them now
-            U32 extraBytes = dataSize - toWrite;
-            if (extraBytes > 0) {
-                if (accumulateProtocolData(data + toWrite, extraBytes)) {
-                    processProtocolBuffer();
-                }
-            }
-        }
-    } else {
-        // Not mid-transfer — look for incoming header
-        if (m_protocolBufferSize > (PROTOCOL_BUFFER_SIZE * 9 / 10)) {
-            if (m_protocolBufferSize > 32) {
-                memmove(m_protocolBuffer, &m_protocolBuffer[m_protocolBufferSize - 32], 32);
-                m_protocolBufferSize = 32;
-            }
-        }
-
-        if (!accumulateProtocolData(data, dataSize)) {
-            clearProtocolBuffer();
-            accumulateProtocolData(data, dataSize);
-        }
-
-        processProtocolBuffer();
+    if (dataSize == 0) {
+        return;
     }
+
+    m_totalBytesReceived += dataSize;
+    m_chunksReceived++;
+    this->tlmWrite_BytesReceivedTotal(m_totalBytesReceived);
+    this->tlmWrite_DataChunksReceived(m_chunksReceived);
+
+    // Diagnostic: dump the first few chunks so we can see what MOSAIC is actually sending.
+    if (m_chunksReceived <= 5 && dataSize >= 8) {
+        this->log_ACTIVITY_LO_RawDataDump(data[0], data[1], data[2], data[3],
+                                          data[4], data[5], data[6], data[7]);
+    }
+
+    if (!accumulateProtocolData(data, dataSize)) {
+        // Overflow: drop the buffered partial record and start fresh with this chunk.
+        clearProtocolBuffer();
+        (void)accumulateProtocolData(data, dataSize);
+    }
+
+    processRecords();
 }
 
 // ----------------------------------------------------------------------
-// Protocol helpers (adapted from MosaicHandler)
+// Protocol helpers
 // ----------------------------------------------------------------------
 
 bool RadiationPayload::accumulateProtocolData(const U8* data, U32 size) {
@@ -109,103 +84,74 @@ bool RadiationPayload::accumulateProtocolData(const U8* data, U32 size) {
     return true;
 }
 
-void RadiationPayload::processProtocolBuffer() {
-    // Search for <GAMMA_START> in the accumulated buffer
-    I32 headerStart = -1;
-    if (m_protocolBufferSize >= GAMMA_START_LEN) {
-        for (U32 i = 0; i <= m_protocolBufferSize - GAMMA_START_LEN; ++i) {
-            if (isGammaStartCommand(&m_protocolBuffer[i], m_protocolBufferSize - i)) {
-                headerStart = static_cast<I32>(i);
-                break;
+void RadiationPayload::processRecords() {
+    while (true) {
+        I32 startIdx = findMarker(reinterpret_cast<const U8*>("<GAMMA_START>"), GAMMA_START_LEN);
+        if (startIdx < 0) {
+            // No start marker yet. Trim to keep the buffer from filling with junk,
+            // but retain enough trailing bytes in case the marker is split across chunks.
+            if (m_protocolBufferSize > (PROTOCOL_BUFFER_SIZE / 2)) {
+                U32 keep = (m_protocolBufferSize > GAMMA_START_LEN) ? GAMMA_START_LEN : m_protocolBufferSize;
+                memmove(m_protocolBuffer, &m_protocolBuffer[m_protocolBufferSize - keep], keep);
+                m_protocolBufferSize = keep;
             }
+            return;
         }
-    }
 
-    if (headerStart == -1) {
-        // No header yet — trim buffer if it's growing large
-        if (m_protocolBufferSize > (PROTOCOL_BUFFER_SIZE / 2)) {
-            if (m_protocolBufferSize > 16) {
-                memmove(m_protocolBuffer, &m_protocolBuffer[m_protocolBufferSize - 16], 16);
-                m_protocolBufferSize = 16;
-            } else {
+        // Discard anything before <GAMMA_START>
+        if (startIdx > 0) {
+            U32 remaining = m_protocolBufferSize - static_cast<U32>(startIdx);
+            memmove(m_protocolBuffer, &m_protocolBuffer[startIdx], remaining);
+            m_protocolBufferSize = remaining;
+        }
+
+        // Look for <GAMMA_END> after the start marker
+        I32 endIdx = findMarker(reinterpret_cast<const U8*>("<GAMMA_END>"), GAMMA_END_LEN, GAMMA_START_LEN);
+        if (endIdx < 0) {
+            // Incomplete record. If the buffer is already full with no end in sight,
+            // the record is malformed/too long — drop it and resync.
+            if (m_protocolBufferSize == PROTOCOL_BUFFER_SIZE) {
                 clearProtocolBuffer();
             }
+            return;
         }
-        return;
-    }
 
-    // Discard bytes before the header
-    if (headerStart > 0) {
-        U32 remaining = m_protocolBufferSize - static_cast<U32>(headerStart);
-        memmove(m_protocolBuffer, &m_protocolBuffer[headerStart], remaining);
+        U32 recordSize = static_cast<U32>(endIdx) + GAMMA_END_LEN;
+        writeCompletedRecord(recordSize);
+
+        // Drop the consumed record (and any trailing '\n' MOSAIC appends after <GAMMA_END>)
+        U32 consume = recordSize;
+        if (consume < m_protocolBufferSize && m_protocolBuffer[consume] == '\n') {
+            consume++;
+        }
+        U32 remaining = m_protocolBufferSize - consume;
+        if (remaining > 0) {
+            memmove(m_protocolBuffer, &m_protocolBuffer[consume], remaining);
+        }
         m_protocolBufferSize = remaining;
-    }
-
-    // Wait until we have the full header
-    if (m_protocolBufferSize < HEADER_SIZE) {
-        return;
-    }
-
-    // Verify <SIZE> tag
-    const char* sizeTag = "<SIZE>";
-    for (U32 i = 0; i < SIZE_TAG_LEN; ++i) {
-        if (m_protocolBuffer[SIZE_TAG_OFFSET + i] != static_cast<U8>(sizeTag[i])) {
-            return;
-        }
-    }
-
-    // Extract 4-byte little-endian size
-    U32 readingSize = 0;
-    readingSize |= static_cast<U32>(m_protocolBuffer[SIZE_VALUE_OFFSET + 0]);
-    readingSize |= static_cast<U32>(m_protocolBuffer[SIZE_VALUE_OFFSET + 1]) << 8;
-    readingSize |= static_cast<U32>(m_protocolBuffer[SIZE_VALUE_OFFSET + 2]) << 16;
-    readingSize |= static_cast<U32>(m_protocolBuffer[SIZE_VALUE_OFFSET + 3]) << 24;
-
-    // Verify </SIZE> tag
-    const char* closeSizeTag = "</SIZE>";
-    for (U32 i = 0; i < SIZE_CLOSE_TAG_LEN; ++i) {
-        if (m_protocolBuffer[SIZE_CLOSE_TAG_OFFSET + i] != static_cast<U8>(closeSizeTag[i])) {
-            return;
-        }
-    }
-
-    // Valid header — begin transfer (file is already open from POWER_ON / rotation)
-    m_receiving = true;
-    m_bytes_received = 0;
-    m_expected_size = readingSize;
-
-    // Remove the header from the buffer
-    U32 afterHeader = m_protocolBufferSize - HEADER_SIZE;
-    if (afterHeader > 0) {
-        memmove(m_protocolBuffer, &m_protocolBuffer[HEADER_SIZE], afterHeader);
-    }
-    m_protocolBufferSize = afterHeader;
-
-    // Write any payload bytes that immediately followed the header
-    if (m_protocolBufferSize > 0 && m_fileOpen) {
-        U32 toWrite = (m_protocolBufferSize < m_expected_size) ? m_protocolBufferSize : m_expected_size;
-        if (writeChunkToFile(m_protocolBuffer, toWrite)) {
-            m_bytes_received += toWrite;
-            if (m_bytes_received >= m_expected_size) {
-                finalizeReading();
-            }
-        } else {
-            handleTransferError();
-        }
-        clearProtocolBuffer();
     }
 }
 
 void RadiationPayload::clearProtocolBuffer() {
     m_protocolBufferSize = 0;
-    memset(m_protocolBuffer, 0, PROTOCOL_BUFFER_SIZE);
+}
+
+I32 RadiationPayload::findMarker(const U8* needle, U32 needleLen, U32 searchFrom) const {
+    if (needleLen == 0 || m_protocolBufferSize < searchFrom + needleLen) {
+        return -1;
+    }
+    for (U32 i = searchFrom; i + needleLen <= m_protocolBufferSize; ++i) {
+        if (memcmp(&m_protocolBuffer[i], needle, needleLen) == 0) {
+            return static_cast<I32>(i);
+        }
+    }
+    return -1;
 }
 
 bool RadiationPayload::writeChunkToFile(const U8* data, U32 size) {
     if (!m_fileOpen || size == 0) {
         return false;
     }
-
     U32 totalWritten = 0;
     const U8* ptr = data;
     while (totalWritten < size) {
@@ -220,24 +166,32 @@ bool RadiationPayload::writeChunkToFile(const U8* data, U32 size) {
     return true;
 }
 
-void RadiationPayload::finalizeReading() {
-    // Delimit readings with a newline
+void RadiationPayload::writeCompletedRecord(U32 recordSize) {
+    if (!m_fileOpen) {
+        // Lazy-open in case configure() couldn't (e.g. FS not ready then).
+        if (!openNextFile()) {
+            Fw::LogStringArg desc("File open failed during write");
+            this->log_WARNING_HI_TransferError(desc);
+            return;
+        }
+    }
+
+    if (!writeChunkToFile(m_protocolBuffer, recordSize)) {
+        Fw::LogStringArg desc("File write failed");
+        this->log_WARNING_HI_TransferError(desc);
+        return;
+    }
+
     const U8 newline = '\n';
     FwSizeType nlSize = 1;
-    m_file.write(&newline, nlSize, Os::File::WaitType::WAIT);
+    (void)m_file.write(&newline, nlSize, Os::File::WaitType::WAIT);
 
     m_readingsInFile++;
     m_totalReadings++;
 
     Fw::LogStringArg pathArg(m_currentFilename);
-    this->log_ACTIVITY_HI_GammaReadingReceived(m_bytes_received, pathArg);
-    // this->log_ACTIVITY_LO_ReadingComplete(m_readingsInFile, m_filesWritten);
+    this->log_ACTIVITY_HI_GammaReadingReceived(recordSize, pathArg);
 
-    m_receiving = false;
-    m_bytes_received = 0;
-    m_expected_size = 0;
-
-    // Rotate file if the reading limit has been reached
     Fw::ParamValid valid;
     U32 readingsPerFile = this->paramGet_READINGS_PER_FILE(valid);
     if (valid != Fw::ParamValid::VALID) {
@@ -249,10 +203,7 @@ void RadiationPayload::finalizeReading() {
         closeCurrentFile();
         m_filesWritten++;
         m_readingsInFile = 0;
-
-        if (!openNextFile()) {
-            return;
-        }
+        (void)openNextFile();
     }
 
     this->tlmWrite_ReadingsInCurrentFile(m_readingsInFile);
@@ -260,40 +211,18 @@ void RadiationPayload::finalizeReading() {
     this->tlmWrite_TotalReadings(m_totalReadings);
 }
 
-void RadiationPayload::handleTransferError() {
-    Fw::LogStringArg desc("Transfer aborted");
-    this->log_WARNING_HI_TransferError(desc);
-    m_receiving = false;
-    m_bytes_received = 0;
-    m_expected_size = 0;
-    clearProtocolBuffer();
-    // Keep the file open — the next successful reading will continue appending
-}
-
-bool RadiationPayload::isGammaStartCommand(const U8* data, U32 length) {
-    if (length < GAMMA_START_LEN) {
-        return false;
-    }
-    const char* marker = "<GAMMA_START>";
-    for (U32 i = 0; i < GAMMA_START_LEN; ++i) {
-        if (data[i] != static_cast<U8>(marker[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
 // ----------------------------------------------------------------------
 // File management helpers
 // ----------------------------------------------------------------------
 
 void RadiationPayload::configure() {
-    // Pre-load the persisted file count so POWER_ON needs no disk read.
-    // Called from the topology after fsFormat.configure(), guaranteeing
-    // the filesystem is ready before we touch it.
+    // Pre-load the persisted file count and open the first file so that the
+    // very first incoming record has somewhere to land. Called from the
+    // topology after fsFormat.configure() so the filesystem is ready.
     U32 count = 0;
     readFileCount(count);
     m_nextFileCount = count;
+    (void)openNextFile();
 }
 
 bool RadiationPayload::openNextFile() {

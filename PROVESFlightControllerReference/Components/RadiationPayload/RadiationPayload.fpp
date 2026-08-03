@@ -28,6 +28,10 @@ module Components {
         event GammaReadingReceived(bytes: U32, path: string) \
             severity activity high format "Received {} bytes, stored in {}"
 
+        @ First 8 bytes of an incoming UART chunk (diagnostic only; emitted for the first chunks after power-on)
+        event RawDataDump(byte0: U8, byte1: U8, byte2: U8, byte3: U8, byte4: U8, byte5: U8, byte6: U8, byte7: U8) \
+            severity activity low format "Raw UART: [{x} {x} {x} {x} {x} {x} {x} {x}]"
+
         # ------------------------------------------------------------------
         # Telemetry
         # ------------------------------------------------------------------
@@ -40,6 +44,12 @@ module Components {
 
         @ Total readings stored across all files this session
         telemetry TotalReadings: U32
+
+        @ Total bytes received over UART this session
+        telemetry BytesReceivedTotal: U32
+
+        @ Number of dataIn callbacks received this session
+        telemetry DataChunksReceived: U32
 
         # ------------------------------------------------------------------
         # Parameters

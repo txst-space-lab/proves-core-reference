@@ -115,6 +115,15 @@ telemetry packets ReferenceDeploymentPackets {
     cameraHandler.ImagesSaved
   }
 
+  packet Mosaic id 23 group 4 {
+    mosaicManager.Recording
+    mosaicManager.SamplesRecorded
+    mosaicManager.FilesWritten
+    mosaicManager.ParseErrors
+    mosaicManager.LatestAdc
+    mosaicManager.LatestMillivolts
+  }
+
   ### Health and Status Packets ###
   packet Health id 2 group 5 {
     ComCcsdsLora.comQueue.comQueueDepth
@@ -138,6 +147,7 @@ telemetry packets ReferenceDeploymentPackets {
     #ComCcsdsSband.commsBufferManager.NoBuffs
     ComCcsdsUart.commsBufferManager.NoBuffs
     payloadBufferManager.NoBuffs
+    mosaicBufferManager.NoBuffs
     rateGroup50Hz.RgCycleSlips
     rateGroup10Hz.RgCycleSlips
     rateGroup1Hz.RgCycleSlips
@@ -148,6 +158,7 @@ telemetry packets ReferenceDeploymentPackets {
     ComCcsdsLora.comQueue.buffQueueDepth
 #    ComCcsdsSband.comQueue.buffQueueDepth
     payloadBufferManager.HiBuffs
+    mosaicBufferManager.HiBuffs
     CdhCore.tlmSend.SectionEnabled
   }
 
@@ -305,6 +316,10 @@ telemetry packets ReferenceDeploymentPackets {
 
   payloadBufferManager.TotalBuffs
   payloadBufferManager.CurrBuffs
+
+  mosaicBufferManager.EmptyBuffs
+  mosaicBufferManager.TotalBuffs
+  mosaicBufferManager.CurrBuffs
 
   CdhCore.tlmSend.GroupConfigs
   CdhCore.version.FrameworkVersion

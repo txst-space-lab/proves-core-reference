@@ -316,14 +316,11 @@ telemetry packets ReferenceDeploymentPackets {
   payloadBufferManager.TotalBuffs
   payloadBufferManager.CurrBuffs
 
-<<<<<<< HEAD
   payloadBufferManager2.EmptyBuffs
   payloadBufferManager2.TotalBuffs
   payloadBufferManager2.CurrBuffs
 
-=======
   CdhCore.tlmSend.GroupConfigs
->>>>>>> 3d761fca73d1967771c25d10ada0a63ae44eb6a2
   CdhCore.version.FrameworkVersion
   CdhCore.version.ProjectVersion
   CdhCore.version.LibraryVersion01

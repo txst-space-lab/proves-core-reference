@@ -8,7 +8,7 @@ The MOSAIC payload streams ASCII CSV lines of the form `ADC=<raw>,MV=<millivolts
 
 - Bytes arriving on `dataIn` are accumulated into lines and parsed into raw ADC/millivolts samples.
 - The input ports and the commands are **guarded**, not sync. `dataIn` is invoked from the 10 Hz rate group thread, `run` from the 1 Hz rate group thread, and the commands from the command dispatcher thread; all three mutate the open file handle and its counters. Guarding serializes them on the component mutex so a `STOP_RECORDING` or a stale-file flush cannot close the file out from under an in-flight sample write.
-- Samples are appended as fixed-size binary records (`seconds: U32` time tag, `adc: U16`, `millivolts: U16`, 8 bytes total) directly to an `Os::File` opened under `/mosaic`.
+- Samples are appended as fixed-size little-endian binary records (`seconds: U32` time tag, `adc: U16`, `millivolts: U16`, 8 bytes total) directly to an `Os::File` opened under `/mosaic`.
 - A file is closed when it fills (100 samples) or when a partially filled file is older than 60 seconds (checked on the 1 Hz rate group), on `FLUSH`, or on `STOP_RECORDING`. The next sample reopens a new file.
 - Files are named `/mosaic/gamma_<seq>.dat` and can be downlinked with the existing file downlink chain (via a ground-commanded file send — there is no automatic catalog/scan).
 - `seq` is an in-RAM counter that resets to 0 on every reboot, but the Zephyr `Os::File` delegate truncates on `OPEN_CREATE` regardless of the `NO_OVERWRITE` flag (unimplemented upstream). To avoid silently wiping a not-yet-downlinked file from a previous boot, `ensureFileOpen()` probes forward with `Os::FileSystem::getPathType()` for the first `seq` not already present on disk before opening.
@@ -16,6 +16,14 @@ The MOSAIC payload streams ASCII CSV lines of the form `ADC=<raw>,MV=<millivolts
 ## Usage Examples
 
 Turn on the payload power load switch; MOSAIC begins streaming immediately and the manager records samples by default. Use `STOP_RECORDING`/`START_RECORDING` to gate recording, and `FLUSH` to force the partially filled file closed before downlinking.
+
+After downlinking a `gamma_*.dat` file, decode and display it from the repository root:
+
+```bash
+python3 tools/decode_mosaic.py gamma_000000.dat
+```
+
+Pass `--utc` to also render the stored seconds as a UTC timestamp, or `--csv` for output that can be redirected into a spreadsheet. The seconds field is Unix time when the spacecraft RTC is available; if the RTC is unavailable, flight software falls back to seconds since boot.
 
 ## Port Descriptions
 | Name         | Description                                               |

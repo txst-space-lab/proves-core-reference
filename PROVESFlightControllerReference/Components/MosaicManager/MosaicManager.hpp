@@ -72,6 +72,10 @@ class MosaicManager final : public MosaicManagerComponentBase {
     //! Record a parsed sample into the current sample file
     void recordSample(U16 adc, U16 millivolts);
 
+    //! Write all buffered samples to the current file in one filesystem operation
+    //! Returns true when the full batch was written
+    bool writeBufferedSamples();
+
     //! Open a fresh sample file if one is not already open
     //! Returns true if a file is available for writing
     bool ensureFileOpen();
@@ -92,6 +96,9 @@ class MosaicManager final : public MosaicManagerComponentBase {
     //! Samples collected per sample file
     static constexpr U32 SAMPLES_PER_FILE = 100;
 
+    //! Samples collected before issuing one filesystem write
+    static constexpr U32 SAMPLES_PER_WRITE = 10;
+
     //! Flush a partially filled file after this many seconds without filling
     static constexpr U32 FLUSH_TIMEOUT_SECONDS = 60;
 
@@ -103,6 +110,9 @@ class MosaicManager final : public MosaicManagerComponentBase {
 
     //! Serialized size of one sample record: U32 time seconds, then raw ADC code and millivolts, both U16
     static constexpr FwSizeType RECORD_SIZE = sizeof(U32) + 2 * sizeof(U16);
+
+    //! Size of the batched filesystem write buffer
+    static constexpr FwSizeType WRITE_BUFFER_SIZE = SAMPLES_PER_WRITE * RECORD_SIZE;
 
     // ----------------------------------------------------------------------
     // Member variables
@@ -116,6 +126,10 @@ class MosaicManager final : public MosaicManagerComponentBase {
     Os::File m_file;
     bool m_fileOpen = false;
     U32 m_samplesInFile = 0;
+
+    //! Samples waiting to be written to the current file
+    U8 m_writeBuffer[WRITE_BUFFER_SIZE];
+    U32 m_bufferedSamples = 0;
 
     //! Time (seconds) when the current file received its first sample
     U32 m_fileStartSeconds = 0;

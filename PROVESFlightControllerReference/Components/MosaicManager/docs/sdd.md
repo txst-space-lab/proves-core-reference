@@ -8,7 +8,7 @@ The MOSAIC payload streams ASCII CSV lines of the form `ADC=<raw>,MV=<millivolts
 
 - Bytes arriving on `dataIn` are accumulated into lines and parsed into raw ADC/millivolts samples.
 - The input ports and the commands are **guarded**, not sync. `dataIn` is invoked from the 10 Hz rate group thread, `run` from the 1 Hz rate group thread, and the commands from the command dispatcher thread; all three mutate the open file handle and its counters. Guarding serializes them on the component mutex so a `STOP_RECORDING` or a stale-file flush cannot close the file out from under an in-flight sample write.
-- Samples are appended as fixed-size little-endian binary records (`seconds: U32` time tag, `adc: U16`, `millivolts: U16`, 8 bytes total) directly to an `Os::File` opened under `/mosaic`.
+- Samples are serialized as fixed-size little-endian binary records (`seconds: U32` time tag, `adc: U16`, `millivolts: U16`, 8 bytes total). Ten records are buffered in memory and appended to the `Os::File` under `/mosaic` in one write; closing a partial file writes the remaining records first.
 - A file is closed when it fills (100 samples) or when a partially filled file is older than 60 seconds (checked on the 1 Hz rate group), on `FLUSH`, or on `STOP_RECORDING`. The next sample reopens a new file.
 - Files are named `/mosaic/gamma_<seq>.dat` and can be downlinked with the existing file downlink chain (via a ground-commanded file send — there is no automatic catalog/scan).
 - `seq` is an in-RAM counter that resets to 0 on every reboot, but the Zephyr `Os::File` delegate truncates on `OPEN_CREATE` regardless of the `NO_OVERWRITE` flag (unimplemented upstream). To avoid silently wiping a not-yet-downlinked file from a previous boot, `ensureFileOpen()` probes forward with `Os::FileSystem::getPathType()` for the first `seq` not already present on disk before opening.
@@ -75,3 +75,4 @@ Pass `--utc` to also render the stored seconds as a UTC timestamp, or `--csv` fo
 | 2026-07-19 | Replaced F Prime data products with direct filesystem writes under /mosaic (DataProducts catalog did not fit in memory on rp2350) |
 | 2026-07-19 | Fixed cross-reboot file overwrite: probe for an unused file index before opening, since the Zephyr file delegate ignores NO_OVERWRITE |
 | 2026-08-03 | Made the input ports and commands guarded; they run on three different threads and raced on the open file handle |
+| 2026-08-04 | Batched 10 samples per filesystem write to reduce the write rate from 10 Hz to approximately 1 Hz |

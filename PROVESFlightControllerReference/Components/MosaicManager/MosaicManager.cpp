@@ -60,7 +60,7 @@ void MosaicManager ::dataIn_handler(FwIndexType portNum, Fw::Buffer& buffer, con
 
 void MosaicManager ::run_handler(FwIndexType portNum, U32 context) {
     // Flush a partially filled file that has been sitting too long
-    if (m_fileOpen && m_samplesInFile > 0) {
+    if (m_fileOpen && ((m_samplesInFile + m_bufferedSamples) > 0)) {
         const U32 now = this->getTime().getSeconds();
         if ((now - m_fileStartSeconds) >= FLUSH_TIMEOUT_SECONDS) {
             this->closeFile();
@@ -86,7 +86,7 @@ void MosaicManager ::START_RECORDING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq)
 
 void MosaicManager ::STOP_RECORDING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     m_recording = false;
-    if (m_fileOpen && m_samplesInFile > 0) {
+    if (m_fileOpen && ((m_samplesInFile + m_bufferedSamples) > 0)) {
         this->closeFile();
     }
     this->tlmWrite_Recording(m_recording);
@@ -95,7 +95,7 @@ void MosaicManager ::STOP_RECORDING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) 
 }
 
 void MosaicManager ::FLUSH_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (m_fileOpen && m_samplesInFile > 0) {
+    if (m_fileOpen && ((m_samplesInFile + m_bufferedSamples) > 0)) {
         this->closeFile();
     }
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
@@ -144,32 +144,48 @@ void MosaicManager ::recordSample(U16 adc, U16 millivolts) {
     }
 
     const U32 seconds = this->getTime().getSeconds();
-    U8 record[RECORD_SIZE];
-    std::memcpy(&record[0], &seconds, sizeof(seconds));
-    std::memcpy(&record[sizeof(seconds)], &adc, sizeof(adc));
-    std::memcpy(&record[sizeof(seconds) + sizeof(adc)], &millivolts, sizeof(millivolts));
+    const FwSizeType offset = m_bufferedSamples * RECORD_SIZE;
+    std::memcpy(&m_writeBuffer[offset], &seconds, sizeof(seconds));
+    std::memcpy(&m_writeBuffer[offset + sizeof(seconds)], &adc, sizeof(adc));
+    std::memcpy(&m_writeBuffer[offset + sizeof(seconds) + sizeof(adc)], &millivolts, sizeof(millivolts));
 
-    FwSizeType writeSize = RECORD_SIZE;
-    const Os::File::Status status = m_file.write(record, writeSize, Os::File::WaitType::WAIT);
-    if ((status != Os::File::OP_OK) || (writeSize != RECORD_SIZE)) {
-        this->log_WARNING_HI_FileWriteError(static_cast<U32>(status));
-        // A short write leaves a torn record on the end of the file, so the
-        // file is abandoned rather than closed: reporting SampleFileClosed
-        // here would advertise a clean, downlinkable file that isn't one.
+    if ((m_samplesInFile + m_bufferedSamples) == 0) {
+        m_fileStartSeconds = seconds;
+    }
+    m_bufferedSamples++;
+
+    if ((m_bufferedSamples >= SAMPLES_PER_WRITE) && !this->writeBufferedSamples()) {
+        // A short write leaves a torn batch on the end of the file. Abandon it
+        // rather than advertising the file as complete and downlinkable.
         this->closeFile(false);
         return;
     }
 
-    if (m_samplesInFile == 0) {
-        m_fileStartSeconds = this->getTime().getSeconds();
-    }
-    m_samplesInFile++;
-    m_samplesRecorded++;
-    this->tlmWrite_SamplesRecorded(m_samplesRecorded);
-
     if (m_samplesInFile >= SAMPLES_PER_FILE) {
         this->closeFile();
     }
+}
+
+bool MosaicManager ::writeBufferedSamples() {
+    if (m_bufferedSamples == 0) {
+        return true;
+    }
+
+    const U32 samplesToWrite = m_bufferedSamples;
+    const FwSizeType expectedSize = samplesToWrite * RECORD_SIZE;
+    FwSizeType writeSize = expectedSize;
+    const Os::File::Status status = m_file.write(m_writeBuffer, writeSize, Os::File::WaitType::WAIT);
+    if ((status != Os::File::OP_OK) || (writeSize != expectedSize)) {
+        this->log_WARNING_HI_FileWriteError(static_cast<U32>(status));
+        m_bufferedSamples = 0;
+        return false;
+    }
+
+    m_bufferedSamples = 0;
+    m_samplesInFile += samplesToWrite;
+    m_samplesRecorded += samplesToWrite;
+    this->tlmWrite_SamplesRecorded(m_samplesRecorded);
+    return true;
 }
 
 bool MosaicManager ::ensureFileOpen() {
@@ -200,12 +216,17 @@ bool MosaicManager ::ensureFileOpen() {
 
     m_fileOpen = true;
     m_samplesInFile = 0;
+    m_bufferedSamples = 0;
     return true;
 }
 
 void MosaicManager ::closeFile(bool complete) {
     Fw::FileNameString path;
     path.format("%s/gamma_%06u.dat", SAMPLE_DIR, m_filesWritten);
+
+    if (complete && !this->writeBufferedSamples()) {
+        complete = false;
+    }
 
     m_file.flush();
     m_file.close();
@@ -216,6 +237,7 @@ void MosaicManager ::closeFile(bool complete) {
 
     m_fileOpen = false;
     m_samplesInFile = 0;
+    m_bufferedSamples = 0;
     m_filesWritten++;
     this->tlmWrite_FilesWritten(m_filesWritten);
 }

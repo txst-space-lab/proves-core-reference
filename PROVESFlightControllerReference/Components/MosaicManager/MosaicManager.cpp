@@ -71,6 +71,7 @@ void MosaicManager ::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_SamplesRecorded(m_samplesRecorded);
     this->tlmWrite_FilesWritten(m_filesWritten);
     this->tlmWrite_ParseErrors(m_parseErrors);
+    this->tlmWrite_FilesystemErrors(m_filesystemErrors);
 }
 
 // ----------------------------------------------------------------------
@@ -78,7 +79,9 @@ void MosaicManager ::run_handler(FwIndexType portNum, U32 context) {
 // ----------------------------------------------------------------------
 
 void MosaicManager ::START_RECORDING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    m_filesystemErrors = 0;
     m_recording = true;
+    this->tlmWrite_FilesystemErrors(m_filesystemErrors);
     this->tlmWrite_Recording(m_recording);
     this->log_ACTIVITY_HI_RecordingStarted();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
@@ -201,6 +204,7 @@ bool MosaicManager ::writeBufferedSamples() {
     const Os::File::Status status = m_file.write(m_writeBuffer, writeSize, Os::File::WaitType::WAIT);
     if ((status != Os::File::OP_OK) || (writeSize != expectedSize)) {
         this->log_WARNING_HI_FileWriteError(static_cast<U32>(status));
+        this->recordFilesystemError();
         m_bufferedSamples = 0;
         return false;
     }
@@ -244,6 +248,7 @@ bool MosaicManager ::ensureFileOpen() {
     const Os::File::Status status = m_file.open(path.toChar(), Os::File::OPEN_CREATE, Os::File::NO_OVERWRITE);
     if (status != Os::File::OP_OK) {
         this->log_WARNING_HI_FileOpenError(path, static_cast<U32>(status));
+        this->recordFilesystemError();
         return false;
     }
 
@@ -273,6 +278,21 @@ void MosaicManager ::closeFile(bool complete) {
     m_bufferedSamples = 0;
     m_filesWritten++;
     this->tlmWrite_FilesWritten(m_filesWritten);
+}
+
+void MosaicManager ::recordFilesystemError() {
+    m_filesystemErrors++;
+    this->tlmWrite_FilesystemErrors(m_filesystemErrors);
+
+    Fw::ParamValid paramValid;
+    const U32 maxFilesystemErrors = this->paramGet_MAX_FILESYSTEM_ERRORS(paramValid);
+    FW_ASSERT((paramValid == Fw::ParamValid::VALID) || (paramValid == Fw::ParamValid::DEFAULT));
+
+    if (m_filesystemErrors >= maxFilesystemErrors) {
+        m_recording = false;
+        this->tlmWrite_Recording(m_recording);
+        this->log_WARNING_HI_ErrorLimitReached(m_filesystemErrors);
+    }
 }
 
 }  // namespace Components

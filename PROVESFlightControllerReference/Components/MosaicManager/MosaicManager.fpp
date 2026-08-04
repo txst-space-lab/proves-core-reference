@@ -25,6 +25,9 @@ module Components {
         @ Maximum number of MOSAIC sample files allowed on the filesystem
         param MAX_FILE_COUNT: U32 default 40
 
+        @ Filesystem errors allowed in one recording run before recording is stopped
+        param MAX_FILESYSTEM_ERRORS: U32 default 5
+
         # ----------------------------------------------------------------------
         # Commands
         # ----------------------------------------------------------------------
@@ -70,6 +73,11 @@ module Components {
             format "Failed to write MOSAIC sample record (status {})" \
             throttle 5
 
+        @ The configured filesystem error limit was reached and recording was stopped
+        event ErrorLimitReached(errorCount: U32) \
+            severity warning high \
+            format "MOSAIC filesystem error limit reached after {} errors; recording stopped"
+
         @ A received line could not be parsed as a MOSAIC sample
         event LineParseError() \
             severity warning low \
@@ -97,6 +105,9 @@ module Components {
 
         @ Total lines that failed to parse
         telemetry ParseErrors: U32
+
+        @ Filesystem errors accumulated during the current recording run
+        telemetry FilesystemErrors: U32
 
         @ Most recent raw ADC reading
         telemetry LatestAdc: U16

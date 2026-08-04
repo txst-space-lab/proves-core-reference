@@ -76,6 +76,9 @@ class MosaicManager final : public MosaicManagerComponentBase {
     //! Returns true when the full batch was written
     bool writeBufferedSamples();
 
+    //! Count a filesystem error and stop recording when the configured limit is reached
+    void recordFilesystemError();
+
     //! Open a fresh sample file if one is not already open
     //! Returns true if a file is available for writing
     bool ensureFileOpen();
@@ -135,6 +138,7 @@ class MosaicManager final : public MosaicManagerComponentBase {
     U32 m_samplesRecorded = 0;
     U32 m_filesWritten = 0;
     U32 m_parseErrors = 0;
+    U32 m_filesystemErrors = 0;
 };
 
 }  // namespace Components

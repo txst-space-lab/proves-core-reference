@@ -11,7 +11,8 @@ The MOSAIC payload streams ASCII CSV lines of the form `ADC=<raw>,MV=<millivolts
 - Samples are serialized as fixed-size little-endian binary records (`seconds: U32` time tag, `adc: U16`, `millivolts: U16`, 8 bytes total). `SAMPLES_PER_WRITE` records (10 by default) are buffered in memory and appended to the `Os::File` under `/mosaic` in one write; closing a partial file writes the remaining records first.
 - A file is closed when it reaches `SAMPLES_PER_FILE` records (100 by default), when a partially filled file is older than 60 seconds (checked on the 1 Hz rate group), on `FLUSH`, or on `STOP_RECORDING`. The next sample reopens a new file.
 - Files are named `/mosaic/gamma_<seq>.dat` and can be downlinked with the existing file downlink chain (via a ground-commanded file send — there is no automatic catalog/scan).
-- `seq` is an in-RAM counter that resets to 0 on every reboot, but the Zephyr `Os::File` delegate truncates on `OPEN_CREATE` regardless of the `NO_OVERWRITE` flag (unimplemented upstream). To avoid silently wiping a not-yet-downlinked file from a previous boot, `ensureFileOpen()` probes forward with `Os::FileSystem::getPathType()` for the first `seq` not already present on disk before opening. When `MAX_FILE_COUNT` files (100 by default) are present, the manager emits `MaxFilesReached` and disables recording until `START_RECORDING` is commanded.
+- `seq` is an in-RAM counter that resets to 0 on every reboot, but the Zephyr `Os::File` delegate truncates on `OPEN_CREATE` regardless of the `NO_OVERWRITE` flag (unimplemented upstream). To avoid silently wiping a not-yet-downlinked file from a previous boot, `ensureFileOpen()` probes forward with `Os::FileSystem::getPathType()` for the first `seq` not already present on disk before opening. When `MAX_FILE_COUNT` files (40 by default) are present, the manager emits `MaxFilesReached` and disables recording until `START_RECORDING` is commanded.
+- File open and write failures increment `FilesystemErrors`. When the count reaches `MAX_FILESYSTEM_ERRORS`, the manager emits `ErrorLimitReached` and disables recording. `START_RECORDING` resets the counter before recording resumes.
 
 ## Usage Examples
 
@@ -40,11 +41,12 @@ Pass `--utc` to also render the stored seconds as a UTC timestamp, or `--csv` fo
 | FLUSH           | Flush and close the current file now                        |
 
 ## Parameters
-| Name              | Description                                                        | Default |
-|-------------------|--------------------------------------------------------------------|---------|
-| SAMPLES_PER_FILE  | Maximum records stored in one file; zero is treated as one         | 100     |
-| SAMPLES_PER_WRITE | Records buffered into one write; zero is treated as one (U8 range) | 10      |
-| MAX_FILE_COUNT    | Maximum sample files allowed; zero disables creation of new files  | 100     |
+| Name                  | Description                                                        | Default |
+|-----------------------|--------------------------------------------------------------------|---------|
+| SAMPLES_PER_FILE      | Maximum records stored in one file; zero is treated as one         | 100     |
+| SAMPLES_PER_WRITE     | Records buffered into one write; zero is treated as one (U8 range) | 10      |
+| MAX_FILE_COUNT        | Maximum sample files allowed; zero disables creation of new files  | 40      |
+| MAX_FILESYSTEM_ERRORS | Filesystem errors allowed before recording stops                   | 5       |
 
 ## Events
 | Name              | Description                                              |
@@ -55,6 +57,7 @@ Pass `--utc` to also render the stored seconds as a UTC timestamp, or `--csv` fo
 | FileOpenError     | Failed to open a new sample file (samples dropped)         |
 | MaxFilesReached   | Maximum file count reached; recording was stopped          |
 | FileWriteError    | A write to the current sample file failed                 |
+| ErrorLimitReached | Filesystem error limit reached; recording was stopped      |
 | LineParseError    | A received line could not be parsed as a MOSAIC sample     |
 | UartReceiveError  | UART receive reported a bad status                         |
 
@@ -65,6 +68,7 @@ Pass `--utc` to also render the stored seconds as a UTC timestamp, or `--csv` fo
 | SamplesRecorded  | Total samples recorded to the filesystem             |
 | FilesWritten     | Total sample files closed and ready for downlink     |
 | ParseErrors      | Total lines that failed to parse                     |
+| FilesystemErrors | Filesystem errors in the current recording run        |
 | LatestAdc        | Most recent raw ADC reading (0–4095)                 |
 | LatestMillivolts | Most recent reading in millivolts                    |
 
@@ -86,3 +90,4 @@ Pass `--utc` to also render the stored seconds as a UTC timestamp, or `--csv` fo
 | 2026-08-04 | Batched 10 samples per filesystem write to reduce the write rate from 10 Hz to approximately 1 Hz |
 | 2026-08-04 | Made per-file sample count, batch size, and maximum file count configurable parameters |
 | 2026-08-04 | Added a dedicated maximum-file event and automatic recording stop at the file limit |
+| 2026-08-04 | Added filesystem error telemetry and automatic recording stop at a configurable error limit |

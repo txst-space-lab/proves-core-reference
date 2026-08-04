@@ -143,6 +143,28 @@ void MosaicManager ::recordSample(U16 adc, U16 millivolts) {
         return;
     }
 
+    Fw::ParamValid paramValid;
+    U32 samplesPerFile = this->paramGet_SAMPLES_PER_FILE(paramValid);
+    FW_ASSERT((paramValid == Fw::ParamValid::VALID) || (paramValid == Fw::ParamValid::DEFAULT));
+    if (samplesPerFile == 0) {
+        samplesPerFile = 1;
+    }
+
+    U32 samplesPerWrite = this->paramGet_SAMPLES_PER_WRITE(paramValid);
+    FW_ASSERT((paramValid == Fw::ParamValid::VALID) || (paramValid == Fw::ParamValid::DEFAULT));
+    if (samplesPerWrite == 0) {
+        samplesPerWrite = 1;
+    }
+
+    // If SAMPLES_PER_FILE was reduced while this file was open, finish the
+    // current file before placing another sample in it.
+    if ((m_samplesInFile + m_bufferedSamples) >= samplesPerFile) {
+        this->closeFile();
+        if (!this->ensureFileOpen()) {
+            return;
+        }
+    }
+
     const U32 seconds = this->getTime().getSeconds();
     const FwSizeType offset = m_bufferedSamples * RECORD_SIZE;
     std::memcpy(&m_writeBuffer[offset], &seconds, sizeof(seconds));
@@ -154,15 +176,17 @@ void MosaicManager ::recordSample(U16 adc, U16 millivolts) {
     }
     m_bufferedSamples++;
 
-    if ((m_bufferedSamples >= SAMPLES_PER_WRITE) && !this->writeBufferedSamples()) {
-        // A short write leaves a torn batch on the end of the file. Abandon it
-        // rather than advertising the file as complete and downlinkable.
-        this->closeFile(false);
+    // The per-file limit takes precedence so the last, possibly partial, batch
+    // is written and the file is closed as soon as its configured size is met.
+    if ((m_samplesInFile + m_bufferedSamples) >= samplesPerFile) {
+        this->closeFile();
         return;
     }
 
-    if (m_samplesInFile >= SAMPLES_PER_FILE) {
-        this->closeFile();
+    if ((m_bufferedSamples >= samplesPerWrite) && !this->writeBufferedSamples()) {
+        // A short write leaves a torn batch on the end of the file. Abandon it
+        // rather than advertising the file as complete and downlinkable.
+        this->closeFile(false);
     }
 }
 
@@ -193,20 +217,29 @@ bool MosaicManager ::ensureFileOpen() {
         return true;
     }
 
+    Fw::ParamValid paramValid;
+    const U32 maxFileCount = this->paramGet_MAX_FILE_COUNT(paramValid);
+    FW_ASSERT((paramValid == Fw::ParamValid::VALID) || (paramValid == Fw::ParamValid::DEFAULT));
+
     // The Zephyr Os::File delegate truncates on OPEN_CREATE regardless of the NO_OVERWRITE flag
     // (its handling of `overwrite` is unimplemented), and m_filesWritten resets to 0 on every reboot.
     // Without this check, reusing a stale index would silently wipe a file from a previous boot that
     // has not yet been downlinked. Search forward for the first name not already on disk.
     Fw::FileNameString path;
-    U32 searched = 0;
-    do {
+    while (m_filesWritten < maxFileCount) {
         path.format("%s/gamma_%06u.dat", SAMPLE_DIR, m_filesWritten);
         if (Os::FileSystem::getPathType(path.toChar()) == Os::FileSystem::NOT_EXIST) {
             break;
         }
         m_filesWritten++;
-        searched++;
-    } while (searched < MAX_FILE_INDEX_SEARCH);
+    }
+
+    if (m_filesWritten >= maxFileCount) {
+        m_recording = false;
+        this->tlmWrite_Recording(m_recording);
+        this->log_WARNING_HI_MaxFilesReached(maxFileCount);
+        return false;
+    }
 
     const Os::File::Status status = m_file.open(path.toChar(), Os::File::OPEN_CREATE, Os::File::NO_OVERWRITE);
     if (status != Os::File::OP_OK) {

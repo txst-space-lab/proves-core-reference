@@ -13,6 +13,19 @@ module Components {
     passive component MosaicManager {
 
         # ----------------------------------------------------------------------
+        # Parameters
+        # ----------------------------------------------------------------------
+
+        @ Maximum number of samples stored in each file; zero is treated as one
+        param SAMPLES_PER_FILE: U32 default 100
+
+        @ Samples buffered per filesystem write; zero is treated as one
+        param SAMPLES_PER_WRITE: U8 default 10
+
+        @ Maximum number of MOSAIC sample files allowed on the filesystem
+        param MAX_FILE_COUNT: U32 default 40
+
+        # ----------------------------------------------------------------------
         # Commands
         # ----------------------------------------------------------------------
 
@@ -45,6 +58,11 @@ module Components {
             severity warning high \
             format "Failed to open MOSAIC sample file {} (status {})" \
             throttle 5
+
+        @ The configured file limit was reached and recording was stopped
+        event MaxFilesReached(maxFileCount: U32) \
+            severity warning high \
+            format "MOSAIC maximum file count {} reached; recording stopped"
 
         @ A write to the current sample file failed
         event FileWriteError(status: U32) \
@@ -122,6 +140,12 @@ module Components {
 
         @ Port for sending telemetry channels to downlink
         telemetry port tlmOut
+
+        @ Port to return the value of a parameter
+        param get port prmGetOut
+
+        @ Port to set the value of a parameter
+        param set port prmSetOut
 
     }
 }

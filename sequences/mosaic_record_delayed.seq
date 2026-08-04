@@ -1,0 +1,2 @@
+; Wait 15 minutes, then record up to 20 MOSAIC files
+R00:15:00 ReferenceDeployment.mosaicManager.START_RECORDING, 20

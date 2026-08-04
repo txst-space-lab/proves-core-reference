@@ -21,3 +21,5 @@ R00:00:00 ReferenceDeployment.modeManager.EXIT_SAFE_MODE
 
 R00:05:00 ReferenceDeployment.detumbleManager.SET_MODE, AUTO
 R03:00:00 ReferenceDeployment.detumbleManager.SET_MODE, DISABLED
+
+R00:30:00 ReferenceDeployment.mosaicManager.START_RECORDING, 20

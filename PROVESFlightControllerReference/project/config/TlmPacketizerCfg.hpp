@@ -18,8 +18,7 @@
 namespace Svc {
 static const FwChanIdType MAX_PACKETIZER_PACKETS = 22;
 
-static const FwChanIdType MAX_PACKETIZER_CHANNELS = 220;  // !< Must be >= number of non-omitted telemetry channels in
-                                                          // system (213 as of MosaicManager + mosaicBufferManager)
+static const FwChanIdType MAX_PACKETIZER_CHANNELS = 220;
 
 static const FwChanIdType TLMPACKETIZER_MAX_MISSING_TLM_CHECK =
     25;  // !< Maximum number of missing telemetry channel checks

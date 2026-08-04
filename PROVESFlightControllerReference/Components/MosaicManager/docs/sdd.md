@@ -16,7 +16,7 @@ The MOSAIC payload streams ASCII CSV lines of the form `ADC=<raw>,MV=<millivolts
 
 ## Usage Examples
 
-Turn on the payload power load switch; MOSAIC begins streaming immediately and the manager records samples by default. Use `STOP_RECORDING`/`START_RECORDING` to gate recording, and `FLUSH` to force the partially filled file closed before downlinking.
+Turn on the payload power load switch; MOSAIC begins streaming immediately, but the manager does not record samples until `START_RECORDING` is commanded. Use `STOP_RECORDING` to stop and close the current file, and `FLUSH` to force a partially filled file closed before downlinking.
 
 After downlinking a `gamma_*.dat` file, decode and display it from the repository root:
 
@@ -91,3 +91,4 @@ Pass `--utc` to also render the stored seconds as a UTC timestamp, or `--csv` fo
 | 2026-08-04 | Made per-file sample count, batch size, and maximum file count configurable parameters |
 | 2026-08-04 | Added a dedicated maximum-file event and automatic recording stop at the file limit |
 | 2026-08-04 | Added filesystem error telemetry and automatic recording stop at a configurable error limit |
+| 2026-08-04 | Changed the boot default so recording remains disabled until commanded |

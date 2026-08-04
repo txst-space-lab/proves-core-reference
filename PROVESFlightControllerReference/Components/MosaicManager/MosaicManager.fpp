@@ -32,7 +32,7 @@ module Components {
         # Commands
         # ----------------------------------------------------------------------
 
-        @ Start recording received samples to the filesystem (default on boot)
+        @ Start recording received samples to the filesystem
         guarded command START_RECORDING()
 
         @ Stop recording; flushes and closes the current file

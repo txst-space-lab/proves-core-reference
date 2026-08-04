@@ -136,7 +136,7 @@ class MosaicManager final : public MosaicManagerComponentBase {
     U32 m_fileStartSeconds = 0;
 
     //! Whether samples are recorded to the filesystem
-    bool m_recording = true;
+    bool m_recording = false;
 
     //! Counters for telemetry
     U32 m_samplesRecorded = 0;

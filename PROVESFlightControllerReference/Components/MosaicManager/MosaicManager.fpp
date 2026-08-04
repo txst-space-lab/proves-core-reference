@@ -1,0 +1,179 @@
+module Components {
+    @ Passive component that receives gamma ray detector data from the MOSAIC
+    @ payload over UART and stores it on disk under the /mosaic directory.
+    @ MOSAIC streams ASCII lines of the form "ADC=<raw>,MV=<millivolts>\n".
+    @ The manager only listens; it never sends commands to the payload.
+    @
+    @ Ports and commands are guarded, not sync: dataIn is driven from the 10Hz
+    @ rate group thread, run from the 1Hz rate group thread, and the commands
+    @ from the command dispatcher thread. All three mutate the open sample file
+    @ and its counters, so they must serialize on the component mutex --
+    @ otherwise a STOP_RECORDING or a stale-file flush can close the file out
+    @ from under an in-flight sample write.
+    passive component MosaicManager {
+
+        # ----------------------------------------------------------------------
+        # Parameters
+        # ----------------------------------------------------------------------
+
+        @ Maximum number of samples stored in each file; zero is treated as one
+        param SAMPLES_PER_FILE: U32 default 100
+
+        @ Samples buffered per filesystem write; zero is treated as one
+        param SAMPLES_PER_WRITE: U8 default 10
+
+        @ Maximum number of MOSAIC sample files allowed on the filesystem
+        param MAX_FILE_COUNT: U32 default 40
+
+        @ Filesystem errors allowed in one recording run before recording is stopped
+        param MAX_FILESYSTEM_ERRORS: U32 default 5
+
+        # ----------------------------------------------------------------------
+        # Commands
+        # ----------------------------------------------------------------------
+
+        @ Record up to fileCount files, then stop; zero leaves recording disabled
+        guarded command START_RECORDING(fileCount: U32)
+
+        @ Stop recording; flushes and closes the current file
+        guarded command STOP_RECORDING()
+
+        @ Flush the current file to disk and close it now
+        guarded command FLUSH()
+
+        @ Delete all MOSAIC sample files. Run only after all wanted files have been downlinked.
+        guarded command CLEAR_DIRECTORY()
+
+        # ----------------------------------------------------------------------
+        # Events
+        # ----------------------------------------------------------------------
+
+        @ Recording was started
+        event RecordingStarted() severity activity high format "MOSAIC sample recording started"
+
+        @ Recording was stopped
+        event RecordingStopped() severity activity high format "MOSAIC sample recording stopped"
+
+        @ A sample file was completed and closed
+        event SampleFileClosed(fileName: string size 32, records: U32) \
+            severity activity high \
+            format "MOSAIC sample file {} closed with {} samples"
+
+        @ Failed to open a new sample file on the filesystem; samples will be dropped
+        event FileOpenError(fileName: string size 32, status: U32) \
+            severity warning high \
+            format "Failed to open MOSAIC sample file {} (status {})" \
+            throttle 5
+
+        @ The configured file limit was reached and recording was stopped
+        event MaxFilesReached(maxFileCount: U32) \
+            severity warning high \
+            format "MOSAIC maximum file count {} reached; recording stopped"
+
+        @ The requested recording count exceeded the available file slots
+        event RecordingFileCountLimited(requestedFileCount: U32, availableFileCount: U32) \
+            severity warning high \
+            format "Requested {} MOSAIC files but only {} slots remain; recording limited to available slots"
+
+        @ All managed sample files were deleted from the MOSAIC directory
+        event DirectoryCleared(filesRemoved: U32) \
+            severity activity high \
+            format "MOSAIC directory cleared; {} sample files removed"
+
+        @ A filesystem operation failed
+        event FileOperationError(
+            filePath: string @< The file path that failed
+            operation: string @< The operation that failed
+            status: U32 @< The filesystem status returned by the operation
+        ) \
+            severity warning high \
+            format "MOSAIC file operation failed for {} ({}, status {})" \
+            throttle 5
+
+        @ The configured filesystem error limit was reached and recording was stopped
+        event ErrorLimitReached(errorCount: U32) \
+            severity warning high \
+            format "MOSAIC filesystem error limit reached after {} errors; recording stopped"
+
+        @ A received line could not be parsed as a MOSAIC sample
+        event LineParseError() \
+            severity warning low \
+            format "Failed to parse a MOSAIC line" \
+            throttle 5
+
+        @ UART receive reported a bad status
+        event UartReceiveError() \
+            severity warning low \
+            format "MOSAIC UART receive error" \
+            throttle 5
+
+        # ----------------------------------------------------------------------
+        # Telemetry
+        # ----------------------------------------------------------------------
+
+        @ Whether samples are currently being recorded to the filesystem
+        telemetry Recording: bool
+
+        @ Total samples recorded to the filesystem
+        telemetry SamplesRecorded: U32
+
+        @ Total sample files closed and ready for downlink
+        telemetry FilesWritten: U32
+
+        @ Total lines that failed to parse
+        telemetry ParseErrors: U32
+
+        @ Filesystem errors accumulated during the current recording run
+        telemetry FilesystemErrors: U32
+
+        @ Most recent raw ADC reading
+        telemetry LatestAdc: U16
+
+        @ Most recent reading in millivolts
+        telemetry LatestMillivolts: U16
+
+        # ----------------------------------------------------------------------
+        # Ports
+        # ----------------------------------------------------------------------
+
+        @ Receives raw byte stream from the MOSAIC UART driver
+        guarded input port dataIn: Drv.ByteStreamData
+
+        @ Returns receive buffers to the UART driver
+        output port bufferReturn: Fw.BufferSend
+
+        @ Rate group input for periodic telemetry and file flush
+        guarded input port run: Svc.Sched
+
+        ###############################################################################
+        # Standard AC Ports: Required for Channels, Events, Commands, and Parameters  #
+        ###############################################################################
+        @ Port for requesting the current time
+        time get port timeCaller
+
+        @ Port for sending command registrations
+        command reg port cmdRegOut
+
+        @ Port for receiving commands
+        command recv port cmdIn
+
+        @ Port for sending command responses
+        command resp port cmdResponseOut
+
+        @ Port for sending textual representation of events
+        text event port logTextOut
+
+        @ Port for sending events to downlink
+        event port logOut
+
+        @ Port for sending telemetry channels to downlink
+        telemetry port tlmOut
+
+        @ Port to return the value of a parameter
+        param get port prmGetOut
+
+        @ Port to set the value of a parameter
+        param set port prmSetOut
+
+    }
+}

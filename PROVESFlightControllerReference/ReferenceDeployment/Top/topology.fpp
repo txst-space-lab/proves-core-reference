@@ -118,6 +118,11 @@ module ReferenceDeployment {
 
     instance picoTempManager
 
+    # MOSAIC gamma ray payload
+    instance mosaicManager
+    instance peripheralUartDriver2
+    instance mosaicBufferManager
+
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
   # ----------------------------------------------------------------------
@@ -272,6 +277,7 @@ module ReferenceDeployment {
       rateGroup10Hz.RateGroupMemberOut[2] -> ComCcsdsLora.aggregator.timeout
       #rateGroup10Hz.RateGroupMemberOut[3] -> ComCcsdsSband.aggregator.timeout
       rateGroup10Hz.RateGroupMemberOut[4] -> peripheralUartDriver.schedIn
+      rateGroup10Hz.RateGroupMemberOut[5] -> peripheralUartDriver2.schedIn
       rateGroup10Hz.RateGroupMemberOut[6] -> FileHandling.fileManager.schedIn
       rateGroup10Hz.RateGroupMemberOut[7] -> cmdSeq.schedIn
       rateGroup10Hz.RateGroupMemberOut[8] -> payloadSeq.schedIn
@@ -301,6 +307,8 @@ module ReferenceDeployment {
       rateGroup1Hz.RateGroupMemberOut[16] -> modeManager.run
       rateGroup1Hz.RateGroupMemberOut[17] -> adcs.run
       rateGroup1Hz.RateGroupMemberOut[18] -> thermalManager.run
+      rateGroup1Hz.RateGroupMemberOut[19] -> mosaicManager.run
+      rateGroup1Hz.RateGroupMemberOut[20] -> mosaicBufferManager.schedIn
 
     }
 
@@ -396,6 +404,17 @@ module ReferenceDeployment {
       # UART driver allocates/deallocates from BufferManager
       peripheralUartDriver.allocate -> payloadBufferManager.bufferGetCallee
       peripheralUartDriver.deallocate -> payloadBufferManager.bufferSendIn
+    }
+
+    connections MosaicPayload {
+      # MOSAIC only streams data; the manager never sends commands to it,
+      # so the UART driver connects directly to the manager (no PayloadCom)
+      peripheralUartDriver2.$recv -> mosaicManager.dataIn
+      mosaicManager.bufferReturn -> peripheralUartDriver2.recvReturnIn
+
+      # UART driver allocates/deallocates from BufferManager
+      peripheralUartDriver2.allocate -> mosaicBufferManager.bufferGetCallee
+      peripheralUartDriver2.deallocate -> mosaicBufferManager.bufferSendIn
     }
 
     #connections MyConnectionGraph {

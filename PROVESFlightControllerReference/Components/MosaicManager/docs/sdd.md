@@ -49,17 +49,17 @@ Pass `--utc` to also render the stored seconds as a UTC timestamp, or `--csv` fo
 | MAX_FILESYSTEM_ERRORS | Filesystem errors allowed before recording stops                   | 5       |
 
 ## Events
-| Name              | Description                                              |
-|-------------------|-----------------------------------------------------------|
-| RecordingStarted  | Recording was started                                     |
-| RecordingStopped  | Recording was stopped                                     |
-| SampleFileClosed  | A sample file was completed and closed                    |
-| FileOpenError     | Failed to open a new sample file (samples dropped)         |
-| MaxFilesReached   | Maximum file count reached; recording was stopped          |
-| FileWriteError    | A write to the current sample file failed                 |
-| ErrorLimitReached | Filesystem error limit reached; recording was stopped      |
-| LineParseError    | A received line could not be parsed as a MOSAIC sample     |
-| UartReceiveError  | UART receive reported a bad status                         |
+| Name               | Description                                                   |
+|--------------------|---------------------------------------------------------------|
+| RecordingStarted   | Recording was started                                         |
+| RecordingStopped   | Recording was stopped                                         |
+| SampleFileClosed   | A sample file was completed and closed                        |
+| FileOpenError      | Failed to open a new sample file (samples dropped)             |
+| MaxFilesReached    | Maximum file count reached; recording was stopped              |
+| FileOperationError | Directory creation or a sample file write failed                 |
+| ErrorLimitReached  | Filesystem error limit reached; recording was stopped          |
+| LineParseError     | A received line could not be parsed as a MOSAIC sample         |
+| UartReceiveError   | UART receive reported a bad status                             |
 
 ## Telemetry
 | Name             | Description                                          |

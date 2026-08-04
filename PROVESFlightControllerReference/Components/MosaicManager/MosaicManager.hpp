@@ -27,6 +27,10 @@ class MosaicManager final : public MosaicManagerComponentBase {
     //! Destroy MosaicManager object
     ~MosaicManager();
 
+    //! Initialize the component
+    void init(FwEnumStoreType instance = 0  //!< Instance ID
+    );
+
   private:
     // ----------------------------------------------------------------------
     // Handler implementations for typed input ports

@@ -22,6 +22,18 @@ MosaicManager ::MosaicManager(const char* const compName) : MosaicManagerCompone
 
 MosaicManager ::~MosaicManager() {}
 
+void MosaicManager ::init(FwEnumStoreType instance) {
+    MosaicManagerComponentBase::init(instance);
+
+    // Create the sample directory if it does not exist
+    const Os::FileSystem::Status dirStatus = Os::FileSystem::createDirectory(SAMPLE_DIR, false);
+    if (dirStatus != Os::FileSystem::OP_OK) {
+        const Fw::LogStringArg logFilePath(SAMPLE_DIR);
+        const Fw::LogStringArg logOperation("create_directory");
+        this->log_WARNING_HI_FileOperationError(logFilePath, logOperation, static_cast<U32>(dirStatus));
+    }
+}
+
 // ----------------------------------------------------------------------
 // Handler implementations for typed input ports
 // ----------------------------------------------------------------------
@@ -203,7 +215,11 @@ bool MosaicManager ::writeBufferedSamples() {
     FwSizeType writeSize = expectedSize;
     const Os::File::Status status = m_file.write(m_writeBuffer, writeSize, Os::File::WaitType::WAIT);
     if ((status != Os::File::OP_OK) || (writeSize != expectedSize)) {
-        this->log_WARNING_HI_FileWriteError(static_cast<U32>(status));
+        Fw::FileNameString path;
+        path.format("%s/gamma_%06u.dat", SAMPLE_DIR, m_filesWritten);
+        const Fw::LogStringArg logFilePath(path.toChar());
+        const Fw::LogStringArg logOperation("write");
+        this->log_WARNING_HI_FileOperationError(logFilePath, logOperation, static_cast<U32>(status));
         this->recordFilesystemError();
         m_bufferedSamples = 0;
         return false;

@@ -67,10 +67,14 @@ module Components {
             severity warning high \
             format "MOSAIC maximum file count {} reached; recording stopped"
 
-        @ A write to the current sample file failed
-        event FileWriteError(status: U32) \
+        @ A filesystem operation failed
+        event FileOperationError(
+            filePath: string @< The file path that failed
+            operation: string @< The operation that failed
+            status: U32 @< The filesystem status returned by the operation
+        ) \
             severity warning high \
-            format "Failed to write MOSAIC sample record (status {})" \
+            format "MOSAIC file operation failed for {} ({}, status {})" \
             throttle 5
 
         @ The configured filesystem error limit was reached and recording was stopped

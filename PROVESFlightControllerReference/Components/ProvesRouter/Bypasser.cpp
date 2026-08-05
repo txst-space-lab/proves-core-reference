@@ -44,7 +44,6 @@ static constexpr uint32_t kBypassOpCodes[] = {
     0x2100B000,  //!< ComCcsdsUart.tcSecurityDeframer.GET_SEQ_NUM
     0x2200B000,  //!< ComCcsdsLora.tcSecurityDeframer.GET_SEQ_NUM
     0x2300B000,  //!< ComCcsdsSband.tcSecurityDeframer.GET_SEQ_NUM
-    0x10065000,  //!< ReferenceDeployment.amateurRadio.TELL_JOKE
 };
 
 //! Check if the OpCode is in the bypass list
